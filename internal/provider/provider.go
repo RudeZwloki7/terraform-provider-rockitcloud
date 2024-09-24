@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/conns"
 	"github.com/hashicorp/terraform-provider-aws/internal/experimental/nullable"
 	"github.com/hashicorp/terraform-provider-aws/internal/service/autoscaling"
+	"github.com/hashicorp/terraform-provider-aws/internal/service/backup"
 	"github.com/hashicorp/terraform-provider-aws/internal/service/ec2"
 	"github.com/hashicorp/terraform-provider-aws/internal/service/eks"
 	"github.com/hashicorp/terraform-provider-aws/internal/service/elbv2"
@@ -288,10 +289,10 @@ func Provider() *schema.Provider {
 			//"aws_launch_configuration": autoscaling.DataSourceLaunchConfiguration(),
 
 			//"aws_backup_framework":   backup.DataSourceFramework(),
-			//"aws_backup_plan":        backup.DataSourcePlan(),
+			"aws_backup_plan": backup.DataSourcePlan(),
 			//"aws_backup_report_plan": backup.DataSourceReportPlan(),
-			//"aws_backup_selection":   backup.DataSourceSelection(),
-			//"aws_backup_vault":       backup.DataSourceVault(),
+			"aws_backup_selection": backup.DataSourceSelection(),
+			"aws_backup_vault":     backup.DataSourceVault(),
 			//
 			//"aws_batch_compute_environment": batch.DataSourceComputeEnvironment(),
 			//"aws_batch_job_queue":           batch.DataSourceJobQueue(),
@@ -388,7 +389,7 @@ func Provider() *schema.Provider {
 			//"aws_ec2_instance_type_offering":                 ec2.DataSourceInstanceTypeOffering(),
 			//"aws_ec2_instance_type_offerings":                ec2.DataSourceInstanceTypeOfferings(),
 			//"aws_ec2_instance_type":                          ec2.DataSourceInstanceType(),
-			//"aws_ec2_instance_types":                         ec2.DataSourceInstanceTypes(),
+			//"aws_ec2_instance_types":                 ec2.DataSourceInstanceTypes(),
 			//"aws_ec2_local_gateway_route_table":              ec2.DataSourceLocalGatewayRouteTable(),
 			//"aws_ec2_local_gateway_route_tables":             ec2.DataSourceLocalGatewayRouteTables(),
 			//"aws_ec2_local_gateway_virtual_interface":        ec2.DataSourceLocalGatewayVirtualInterface(),
@@ -835,11 +836,12 @@ func Provider() *schema.Provider {
 			//
 			//"aws_backup_framework":                backup.ResourceFramework(),
 			//"aws_backup_global_settings":          backup.ResourceGlobalSettings(),
-			//"aws_backup_plan":                     backup.ResourcePlan(),
+			"aws_backup_plan": backup.ResourcePlan(),
 			//"aws_backup_region_settings":          backup.ResourceRegionSettings(),
 			//"aws_backup_report_plan":              backup.ResourceReportPlan(),
-			//"aws_backup_selection":                backup.ResourceSelection(),
-			//"aws_backup_vault":                    backup.ResourceVault(),
+			"aws_backup_selection":     backup.ResourceSelection(),
+			"aws_backup_vault_default": backup.ResourceDefaultVault(),
+			//"aws_backup_vault":     backup.ResourceVault(),
 			//"aws_backup_vault_lock_configuration": backup.ResourceVaultLockConfiguration(),
 			//"aws_backup_vault_notifications":      backup.ResourceVaultNotifications(),
 			//"aws_backup_vault_policy":             backup.ResourceVaultPolicy(),
