@@ -17,13 +17,13 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/create"
 	"github.com/hashicorp/terraform-provider-aws/internal/flex"
 	"github.com/hashicorp/terraform-provider-aws/internal/tfresource"
-	"github.com/hashicorp/terraform-provider-aws/internal/verify"
 )
 
 func ResourceSelection() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceSelectionCreate,
 		Read:   resourceSelectionRead,
+		Update: resourceSelectionUpdate,
 		Delete: resourceSelectionDelete,
 		Importer: &schema.ResourceImporter{
 			State: resourceSelectionImportState,
@@ -33,7 +33,6 @@ func ResourceSelection() *schema.Resource {
 			"name": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: true,
 				ValidateFunc: validation.All(
 					validation.StringLenBetween(1, 50),
 					validation.StringMatch(regexp.MustCompile(`^[a-zA-Z0-9\-\_\.]+$`), "must contain only alphanumeric, hyphen, underscore, and period characters"),
@@ -131,15 +130,12 @@ func ResourceSelection() *schema.Resource {
 				},
 			},
 			"iam_role_arn": {
-				Type:         schema.TypeString,
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: verify.ValidARN,
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 			"selection_tag": {
 				Type:     schema.TypeSet,
 				Optional: true,
-				ForceNew: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"type": {
@@ -172,8 +168,7 @@ func ResourceSelection() *schema.Resource {
 			},
 			"resources": {
 				Type:     schema.TypeSet,
-				Optional: true,
-				ForceNew: true,
+				Required: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
 		},
@@ -184,12 +179,21 @@ func resourceSelectionCreate(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*conns.AWSClient).BackupConn
 
 	selection := &backup.Selection{
-		Conditions:    expandBackupConditions(d.Get("condition").(*schema.Set).List()),
-		IamRoleArn:    aws.String(d.Get("iam_role_arn").(string)),
-		ListOfTags:    expandBackupConditionTags(d.Get("selection_tag").(*schema.Set).List()),
-		NotResources:  flex.ExpandStringSet(d.Get("not_resources").(*schema.Set)),
+		IamRoleArn:    aws.String(""), // FIXME: API requires that field but the value is not used
 		Resources:     flex.ExpandStringSet(d.Get("resources").(*schema.Set)),
 		SelectionName: aws.String(d.Get("name").(string)),
+	}
+
+	if v, ok := d.GetOk("condition"); ok && v.(*schema.Set).Len() > 0 {
+		selection.Conditions = expandBackupConditions(v.(*schema.Set).List())
+	}
+
+	if v, ok := d.GetOk("selection_tag"); ok && v.(*schema.Set).Len() > 0 {
+		selection.ListOfTags = expandBackupConditionTags(v.(*schema.Set).List())
+	}
+
+	if v, ok := d.GetOk("not_resources"); ok && v.(*schema.Set).Len() > 0 {
+		selection.NotResources = flex.ExpandStringSet(v.(*schema.Set))
 	}
 
 	input := &backup.CreateBackupSelectionInput{
@@ -252,7 +256,7 @@ func resourceSelectionRead(d *schema.ResourceData, meta interface{}) error {
 
 		resp, err = conn.GetBackupSelection(input)
 
-		if d.IsNewResource() && tfawserr.ErrCodeEquals(err, backup.ErrCodeResourceNotFoundException) {
+		if d.IsNewResource() && tfawserr.ErrCodeEquals(err, errCodeSelectionNotFound) {
 			return resource.RetryableError(err)
 		}
 
@@ -271,13 +275,13 @@ func resourceSelectionRead(d *schema.ResourceData, meta interface{}) error {
 		resp, err = conn.GetBackupSelection(input)
 	}
 
-	if !d.IsNewResource() && tfawserr.ErrCodeEquals(err, backup.ErrCodeResourceNotFoundException) {
+	if !d.IsNewResource() && tfawserr.ErrCodeEquals(err, errCodeSelectionNotFound) {
 		log.Printf("[WARN] Backup Selection (%s) not found, removing from state", d.Id())
 		d.SetId("")
 		return nil
 	}
 
-	if !d.IsNewResource() && tfawserr.ErrMessageContains(err, backup.ErrCodeInvalidParameterValueException, "Cannot find Backup plan") {
+	if !d.IsNewResource() && tfawserr.ErrCodeEquals(err, errCodePlanNotFound) {
 		log.Printf("[WARN] Backup Selection (%s) not found, removing from state", d.Id())
 		d.SetId("")
 		return nil
@@ -293,7 +297,6 @@ func resourceSelectionRead(d *schema.ResourceData, meta interface{}) error {
 
 	d.Set("plan_id", resp.BackupPlanId)
 	d.Set("name", resp.BackupSelection.SelectionName)
-	d.Set("iam_role_arn", resp.BackupSelection.IamRoleArn)
 
 	if conditions := resp.BackupSelection.Conditions; conditions != nil {
 		if err := d.Set("condition", flattenBackupConditions(conditions)); err != nil {
@@ -332,6 +335,32 @@ func resourceSelectionRead(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	return nil
+}
+
+func resourceSelectionUpdate(d *schema.ResourceData, meta interface{}) error {
+	conn := meta.(*conns.AWSClient).BackupConn
+
+	if d.HasChanges("name", "resources") {
+		selection := &backup.Selection{
+			IamRoleArn:    aws.String(""), // FIXME: API requires that field but the value is not used
+			Resources:     flex.ExpandStringSet(d.Get("resources").(*schema.Set)),
+			SelectionName: aws.String(d.Get("name").(string)),
+		}
+
+		input := &backup.UpdateBackupSelectionInput{
+			BackupPlanId:    aws.String(d.Get("plan_id").(string)),
+			SelectionId:     aws.String(d.Id()),
+			BackupSelection: selection,
+		}
+
+		log.Printf("[DEBUG] Updating Backup Selection: %#v", input)
+
+		if _, err := conn.UpdateBackupSelection(input); err != nil {
+			return fmt.Errorf("error updating Backup Selection: %s", err)
+		}
+	}
+
+	return resourceSelectionRead(d, meta)
 }
 
 func resourceSelectionDelete(d *schema.ResourceData, meta interface{}) error {
