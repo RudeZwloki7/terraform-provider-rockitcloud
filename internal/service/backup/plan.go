@@ -35,7 +35,6 @@ func ResourcePlan() *schema.Resource {
 			"name": {
 				Type:     schema.TypeString,
 				Required: true,
-				ForceNew: true,
 			},
 			"rule": {
 				Type:     schema.TypeSet,
@@ -157,26 +156,22 @@ func ResourcePlan() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"tags":     tftags.TagsSchema(),
-			"tags_all": tftags.TagsSchemaComputed(),
 		},
-
-		CustomizeDiff: verify.SetTagsDiff,
 	}
 }
 
 func resourcePlanCreate(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*conns.AWSClient).BackupConn
-	defaultTagsConfig := meta.(*conns.AWSClient).DefaultTagsConfig
-	tags := defaultTagsConfig.MergeTags(tftags.New(d.Get("tags").(map[string]interface{})))
 
 	input := &backup.CreateBackupPlanInput{
 		BackupPlan: &backup.PlanInput{
-			BackupPlanName:         aws.String(d.Get("name").(string)),
-			Rules:                  expandBackupPlanRules(d.Get("rule").(*schema.Set)),
-			AdvancedBackupSettings: expandBackupPlanAdvancedBackupSettings(d.Get("advanced_backup_setting").(*schema.Set)),
+			BackupPlanName: aws.String(d.Get("name").(string)),
+			Rules:          expandBackupPlanRules(d.Get("rule").(*schema.Set)),
 		},
-		BackupPlanTags: Tags(tags.IgnoreAWS()),
+	}
+
+	if v, ok := d.GetOk("advanced_backup_setting"); ok && v.(*schema.Set).Len() > 0 {
+		input.BackupPlan.AdvancedBackupSettings = expandBackupPlanAdvancedBackupSettings(v.(*schema.Set))
 	}
 
 	log.Printf("[DEBUG] Creating Backup Plan: %#v", input)
@@ -192,13 +187,11 @@ func resourcePlanCreate(d *schema.ResourceData, meta interface{}) error {
 
 func resourcePlanRead(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*conns.AWSClient).BackupConn
-	defaultTagsConfig := meta.(*conns.AWSClient).DefaultTagsConfig
-	ignoreTagsConfig := meta.(*conns.AWSClient).IgnoreTagsConfig
 
 	resp, err := conn.GetBackupPlan(&backup.GetBackupPlanInput{
 		BackupPlanId: aws.String(d.Id()),
 	})
-	if tfawserr.ErrCodeEquals(err, backup.ErrCodeResourceNotFoundException) {
+	if tfawserr.ErrCodeEquals(err, errCodePlanNotFound) {
 		log.Printf("[WARN] Backup Plan (%s) not found, removing from state", d.Id())
 		d.SetId("")
 		return nil
@@ -221,48 +214,29 @@ func resourcePlanRead(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("error setting advanced_backup_setting: %w", err)
 	}
 
-	tags, err := ListTags(conn, d.Get("arn").(string))
-	if err != nil {
-		return fmt.Errorf("error listing tags for Backup Plan (%s): %w", d.Id(), err)
-	}
-	tags = tags.IgnoreAWS().IgnoreConfig(ignoreTagsConfig)
-
-	//lintignore:AWSR002
-	if err := d.Set("tags", tags.RemoveDefaultConfig(defaultTagsConfig).Map()); err != nil {
-		return fmt.Errorf("error setting tags: %w", err)
-	}
-
-	if err := d.Set("tags_all", tags.Map()); err != nil {
-		return fmt.Errorf("error setting tags_all: %w", err)
-	}
-
 	return nil
 }
 
 func resourcePlanUpdate(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*conns.AWSClient).BackupConn
 
-	if d.HasChanges("rule", "advanced_backup_setting") {
+	if d.HasChanges("advanced_backup_setting", "name", "rule") {
 		input := &backup.UpdateBackupPlanInput{
 			BackupPlanId: aws.String(d.Id()),
 			BackupPlan: &backup.PlanInput{
-				BackupPlanName:         aws.String(d.Get("name").(string)),
-				Rules:                  expandBackupPlanRules(d.Get("rule").(*schema.Set)),
-				AdvancedBackupSettings: expandBackupPlanAdvancedBackupSettings(d.Get("advanced_backup_setting").(*schema.Set)),
+				BackupPlanName: aws.String(d.Get("name").(string)),
+				Rules:          expandBackupPlanRules(d.Get("rule").(*schema.Set)),
 			},
+		}
+
+		if v, ok := d.GetOk("advanced_backup_setting"); ok && v.(*schema.Set).Len() > 0 {
+			input.BackupPlan.AdvancedBackupSettings = expandBackupPlanAdvancedBackupSettings(v.(*schema.Set))
 		}
 
 		log.Printf("[DEBUG] Updating Backup Plan: %#v", input)
 		_, err := conn.UpdateBackupPlan(input)
 		if err != nil {
 			return fmt.Errorf("error updating Backup Plan (%s): %w", d.Id(), err)
-		}
-	}
-
-	if d.HasChange("tags_all") {
-		o, n := d.GetChange("tags_all")
-		if err := UpdateTags(conn, d.Get("arn").(string), o, n); err != nil {
-			return fmt.Errorf("error updating tags for Backup Plan (%s): %w", d.Id(), err)
 		}
 	}
 
@@ -280,11 +254,11 @@ func resourcePlanDelete(d *schema.ResourceData, meta interface{}) error {
 	err := resource.Retry(2*time.Minute, func() *resource.RetryError {
 		_, err := conn.DeleteBackupPlan(input)
 
-		if tfawserr.ErrMessageContains(err, backup.ErrCodeInvalidRequestException, "Related backup plan selections must be deleted prior to backup") {
+		if tfawserr.ErrMessageContains(err, errCodeSelectionsNotEmpty, "Related backup plan selections must be deleted prior to backup") {
 			return resource.RetryableError(err)
 		}
 
-		if tfawserr.ErrCodeEquals(err, backup.ErrCodeResourceNotFoundException) {
+		if tfawserr.ErrCodeEquals(err, errCodePlanNotFound) {
 			return nil
 		}
 
@@ -318,18 +292,24 @@ func expandBackupPlanRules(vRules *schema.Set) []*backup.RuleInput {
 		} else {
 			continue
 		}
+
 		if vTargetVaultName, ok := mRule["target_vault_name"].(string); ok && vTargetVaultName != "" {
 			rule.TargetBackupVaultName = aws.String(vTargetVaultName)
 		}
+
 		if vSchedule, ok := mRule["schedule"].(string); ok && vSchedule != "" {
 			rule.ScheduleExpression = aws.String(vSchedule)
 		}
-		if vEnableContinuousBackup, ok := mRule["enable_continuous_backup"].(bool); ok {
+
+		// FIXME: Ignore unsupported field by default value
+		if vEnableContinuousBackup, ok := mRule["enable_continuous_backup"].(bool); ok && vEnableContinuousBackup {
 			rule.EnableContinuousBackup = aws.Bool(vEnableContinuousBackup)
 		}
+
 		if vStartWindow, ok := mRule["start_window"].(int); ok {
 			rule.StartWindowMinutes = aws.Int64(int64(vStartWindow))
 		}
+
 		if vCompletionWindow, ok := mRule["completion_window"].(int); ok {
 			rule.CompletionWindowMinutes = aws.Int64(int64(vCompletionWindow))
 		}
@@ -406,6 +386,7 @@ func expandBackupPlanLifecycle(l []interface{}) *backup.Lifecycle {
 		if vDeleteAfter, ok := lc["delete_after"]; ok && vDeleteAfter.(int) > 0 {
 			lifecycle.DeleteAfterDays = aws.Int64(int64(vDeleteAfter.(int)))
 		}
+
 		if vMoveToColdStorageAfterDays, ok := lc["cold_storage_after"]; ok && vMoveToColdStorageAfterDays.(int) > 0 {
 			lifecycle.MoveToColdStorageAfterDays = aws.Int64(int64(vMoveToColdStorageAfterDays.(int)))
 		}

@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/backup"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-aws/internal/conns"
-	tftags "github.com/hashicorp/terraform-provider-aws/internal/tags"
 )
 
 func DataSourcePlan() *schema.Resource {
@@ -27,7 +26,6 @@ func DataSourcePlan() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"tags": tftags.TagsSchemaComputed(),
 			"version": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -38,7 +36,6 @@ func DataSourcePlan() *schema.Resource {
 
 func dataSourcePlanRead(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*conns.AWSClient).BackupConn
-	ignoreTagsConfig := meta.(*conns.AWSClient).IgnoreTagsConfig
 
 	id := d.Get("plan_id").(string)
 
@@ -53,14 +50,6 @@ func dataSourcePlanRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("arn", resp.BackupPlanArn)
 	d.Set("name", resp.BackupPlan.BackupPlanName)
 	d.Set("version", resp.VersionId)
-
-	tags, err := ListTags(conn, aws.StringValue(resp.BackupPlanArn))
-	if err != nil {
-		return fmt.Errorf("error listing tags for Backup Plan (%s): %w", id, err)
-	}
-	if err := d.Set("tags", tags.IgnoreAWS().IgnoreConfig(ignoreTagsConfig).Map()); err != nil {
-		return fmt.Errorf("error setting tags: %w", err)
-	}
 
 	return nil
 }
