@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/backup"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-provider-aws/internal/conns"
-	tftags "github.com/hashicorp/terraform-provider-aws/internal/tags"
 )
 
 func DataSourceVault() *schema.Resource {
@@ -31,14 +30,12 @@ func DataSourceVault() *schema.Resource {
 				Type:     schema.TypeInt,
 				Computed: true,
 			},
-			"tags": tftags.TagsSchemaComputed(),
 		},
 	}
 }
 
 func dataSourceVaultRead(d *schema.ResourceData, meta interface{}) error {
 	conn := meta.(*conns.AWSClient).BackupConn
-	ignoreTagsConfig := meta.(*conns.AWSClient).IgnoreTagsConfig
 
 	name := d.Get("name").(string)
 	input := &backup.DescribeBackupVaultInput{
@@ -55,14 +52,6 @@ func dataSourceVaultRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("kms_key_arn", resp.EncryptionKeyArn)
 	d.Set("name", resp.BackupVaultName)
 	d.Set("recovery_points", resp.NumberOfRecoveryPoints)
-
-	tags, err := ListTags(conn, aws.StringValue(resp.BackupVaultArn))
-	if err != nil {
-		return fmt.Errorf("error listing tags for Backup Vault (%s): %w", name, err)
-	}
-	if err := d.Set("tags", tags.IgnoreAWS().IgnoreConfig(ignoreTagsConfig).Map()); err != nil {
-		return fmt.Errorf("error setting tags: %w", err)
-	}
 
 	return nil
 }

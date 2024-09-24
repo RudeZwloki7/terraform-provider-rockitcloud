@@ -15,7 +15,7 @@ func FindBackupVaultAccessPolicyByName(conn *backup.Backup, name string) (*backu
 
 	output, err := conn.GetBackupVaultAccessPolicy(input)
 
-	if tfawserr.ErrCodeEquals(err, backup.ErrCodeResourceNotFoundException) || tfawserr.ErrCodeEquals(err, errCodeAccessDeniedException) {
+	if tfawserr.ErrCodeEquals(err, errCodeVaultNotFound) || tfawserr.ErrCodeEquals(err, errCodeAccessDeniedException) {
 		return nil, &resource.NotFoundError{
 			LastError:   err,
 			LastRequest: input,
@@ -40,7 +40,7 @@ func FindBackupVaultByName(conn *backup.Backup, name string) (*backup.DescribeBa
 
 	output, err := conn.DescribeBackupVault(input)
 
-	if tfawserr.ErrCodeEquals(err, backup.ErrCodeResourceNotFoundException) || tfawserr.ErrCodeEquals(err, errCodeAccessDeniedException) {
+	if tfawserr.ErrCodeEquals(err, errCodeVaultNotFound) || tfawserr.ErrCodeEquals(err, errCodeAccessDeniedException) {
 		return nil, &resource.NotFoundError{
 			LastError:   err,
 			LastRequest: input,
