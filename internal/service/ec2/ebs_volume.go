@@ -192,7 +192,7 @@ func resourceEBSVolumeRead(d *schema.ResourceData, meta interface{}) error {
 	arn := arn.ARN{
 		Partition: meta.(*conns.AWSClient).Partition,
 		Service:   ec2.ServiceName,
-		Region:    meta.(*conns.AWSClient).Region,
+		Region:    "", // Region in ARNs is not supported
 		AccountID: meta.(*conns.AWSClient).AccountID,
 		Resource:  fmt.Sprintf("volume/%s", d.Id()),
 	}

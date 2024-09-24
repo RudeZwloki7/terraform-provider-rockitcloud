@@ -1131,7 +1131,7 @@ func resourceInstanceRead(d *schema.ResourceData, meta interface{}) error {
 
 	arn := arn.ARN{
 		Partition: meta.(*conns.AWSClient).Partition,
-		Region:    meta.(*conns.AWSClient).Region,
+		Region:    "", // Region in ARNs is not supported
 		Service:   ec2.ServiceName,
 		AccountID: meta.(*conns.AWSClient).AccountID,
 		Resource:  fmt.Sprintf("instance/%s", d.Id()),
