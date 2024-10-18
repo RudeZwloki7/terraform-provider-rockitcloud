@@ -22,7 +22,7 @@ data "aws_backup_plan" "example" {
 
 The following arguments are supported:
 
-* `plan_id` - (Required) The backup plan ID.
+* `plan_id` - (Required) The ID of the backup plan.
 
 ## Attribute Reference
 
@@ -34,4 +34,4 @@ In addition to the arguments above, the following attributes are exported:
 ->  **Unsupported attributes**
 These attributes are currently unsupported:
 
-* `version` - Unique, randomly generated, Unicode, UTF-8 encoded string that serves as the version ID of the backup plan. Always `""`.
+* `version` - Unique, randomly generated, Unicode, UTF-8 encoded string used as the version ID of the backup plan. Always `""`.
