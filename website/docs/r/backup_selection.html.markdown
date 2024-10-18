@@ -69,9 +69,9 @@ resource "aws_backup_selection" "example" {
 
 The following arguments are supported:
 
-* `name` - (Required, Editable) The selection name. The value must be `1` to `50` characters long and must contain only alphanumeric, hyphen, underscore, and period characters.
-* `plan_id` - (Required) The backup plan ID.
-* `resources` - (Required, Editable) The list of Amazon Resource Names (ARNs) resources included into the backup plan.
+* `name` - (Required, Editable) The selection name. The value must be `1` to `50` characters long and must contain only alphanumeric, hyphen, underscore, or periods.
+* `plan_id` - (Required) The ID of the backup plan.
+* `resources` - (Required, Editable) The list of Amazon Resource Names (ARNs) of the resources included into the backup plan.
 
 ## Attribute Reference
 
@@ -83,8 +83,8 @@ In addition to all arguments above, the following attributes are exported:
 These attributes are currently unsupported:
 
 * `condition` - A list of conditions that you define to assign resources to your backup plans using tags. Always empty.
-* `iam_role_arn` -  The Amazon Resource Name (ARN) of the role used for authentication when the resource is backed up (not implemented, added to ensure compatibility with AWS). Always `""`.
-* `not_resources` - An array of strings that either contain Amazon Resource Names (ARNs) or match patterns of resources to exclude from a backup plan. Always empty.
+* `iam_role_arn` -  The Amazon Resource Name (ARN) of the role used for authentication when the resource is backed up. Always `""`.
+* `not_resources` - An array of strings that contains either Amazon Resource Names (ARNs) or match patterns of resources to be excluded from a backup plan. Always empty.
 * `selection_tag` - Tag-based conditions used to specify a set of resources to assign to a backup plan. Always empty.
 
 ## Import

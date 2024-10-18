@@ -27,7 +27,7 @@ data "aws_backup_selection" "example" {
 
 The following arguments are supported:
 
-* `plan_id` - (Required) The backup plan ID.
+* `plan_id` - (Required) The ID of the backup plan.
 * `selection_id` - (Required) The ID of the resource selection.
 
 ## Attribute Reference
@@ -35,9 +35,9 @@ The following arguments are supported:
 In addition to all arguments above, the following attributes are exported:
 
 * `name` - The selection name.
-* `resources` - The list of Amazon Resource Names (ARNs) resources included into the backup plan.
+* `resources` - The list of Amazon Resource Names (ARNs) of the resources included into the backup plan.
 
 ->  **Unsupported attributes**
 These attributes are currently unsupported:
 
-* `iam_role_arn` - The Amazon Resource Name (ARN) of the role used for authentication when the resource is backed up (not implemented, added to ensure compatibility with AWS). Always `""`.
+* `iam_role_arn` - The Amazon Resource Name (ARN) of the role used for authentication when the resource is backed up. Always `""`.
