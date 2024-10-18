@@ -27,7 +27,7 @@ Currently no arguments are used for the resource.
 In addition to all arguments above, the following attributes are exported:
 
 * `arn` - The Amazon Resource Name (ARN) of the backup vault.
-* `id` - The name of the backup vault.
+* `id` - The ID of the backup vault.
 * `name` - The name of the backup vault.
 * `recovery_points` - The number of recovery points in the backup vault.
 
