@@ -64,6 +64,7 @@ In addition to all arguments above, the following attributes are exported:
 * `volume_id` - (String) The ID of the volume.
     * _Example:_ `vol-12345678`
 * `volume_type` - (String) The type of the volume.
+* `encrypted` - (Boolean) If the EBS volume is encrypted.
 
 ### Unsupported attributes
 
@@ -71,4 +72,4 @@ In addition to all arguments above, the following attributes are exported:
 
 The following attributes are not currently supported:
 
-`encrypted`, `kms_key_id`, `multi_attach_enabled`, `outpost_arn`.
+`kms_key_id`, `multi_attach_enabled`, `outpost_arn`.

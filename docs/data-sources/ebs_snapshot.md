@@ -70,6 +70,7 @@ In addition to all arguments above, the following attributes are exported:
 * `volume_id` - (String) The ID of the volume.
     * _Example:_ `vol-12345678`
 * `volume_size` - (Integer) The size of the volume in GiB.
+* `encrypted` - (Boolean) If the snapshot is encrypted.
 
 ### Unsupported attributes
 
@@ -77,4 +78,4 @@ In addition to all arguments above, the following attributes are exported:
 
 The following attributes are not currently supported:
 
-`data_encryption_key_id`, `encrypted`, `kms_key_id`, `outpost_arn`, `storage_tier`.
+`data_encryption_key_id`, `kms_key_id`, `outpost_arn`, `storage_tier`.

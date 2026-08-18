@@ -75,6 +75,7 @@ The `ebs_block_device` block has the following structure:
     * _Constraints:_ Required unless `snapshot_id` is set. If `snapshot_id` is set and `volume_size` is omitted then the volume will have the same size as the selected snapshot
 * `volume_type` - (Optional) The type of EBS volume to create.
     * _Default value:_ `st2`
+* `encrypted` - (Optional) If the EBS volume is encrypted.
 
 ### ephemeral_block_device
 
@@ -107,7 +108,7 @@ In addition to all arguments above, the following attributes are exported:
 
 The following attributes are not currently supported:
 
-`boot_mode`, `deprecation_time`, `ebs_block_device.encrypted`, `ebs_block_device.kms_key_id`, `ebs_block_device.outpost_arn`, `ebs_block_device.throughput`, `ena_support`, `hypervisor`, `image_location`, `kernel_id`, `platform_details`, `ramdisk_id`, `sriov_net_support`, `usage_operation`.
+`boot_mode`, `deprecation_time`, `ebs_block_device.kms_key_id`, `ebs_block_device.outpost_arn`, `ebs_block_device.throughput`, `ena_support`, `hypervisor`, `image_location`, `kernel_id`, `platform_details`, `ramdisk_id`, `sriov_net_support`, `usage_operation`.
 
 ## Timeouts
 

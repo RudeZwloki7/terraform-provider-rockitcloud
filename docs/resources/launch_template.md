@@ -106,6 +106,7 @@ The `ebs` block has the following structure:
 * `snapshot_id` - (Optional) The ID of the snapshot to mount.
 * `volume_size` - (Optional) The size of the volume in GiB.
 * `volume_type` - (Optional) The type of the volume.
+* `encrypted` - (Optional) If the EBS volume is encrypted.
 
 ### monitoring
 
@@ -176,7 +177,7 @@ In addition to all arguments above, the following attributes are exported:
 
 The following attributes are not currently supported:
 
-`block_device_mappings.ebs.encrypted`, `block_device_mappings.ebs.kms_key_id`, `block_device_mappings.ebs.throughput`, `block_device_mappings.virtual_name`, `capacity_reservation_specification`, `cpu_options`, `credit_specification`, `ebs_optimized`, `elastic_gpu_specifications`, `elastic_inference_accelerator`, `enclave_options`, `hibernation_options`, `iam_instance_profile`, `instance_market_options`, `instance_requirements`, `kernel_id`, `license_specification`, `maintenance_options`, `metadata_options`, `network_interfaces.associate_carrier_ip_address`, `network_interfaces.interface_type`, `network_interfaces.ipv4_address_count`, `network_interfaces.ipv4_addresses`, `network_interfaces.ipv4_prefix_count`, `network_interfaces.ipv4_prefixes`, `network_interfaces.ipv6_address_count`, `network_interfaces.ipv6_addresses`, `network_interfaces.ipv6_prefix_count`, `network_interfaces.ipv6_prefixes`, `network_interfaces.network_card_index`, `placement.host_resource_group_arn`, `placement.spread_domain`, `placement.partition_number`, `private_dns_name_options`, `ram_disk_id`, `security_group_names`.
+`block_device_mappings.ebs.kms_key_id`, `block_device_mappings.ebs.throughput`, `block_device_mappings.virtual_name`, `capacity_reservation_specification`, `cpu_options`, `credit_specification`, `ebs_optimized`, `elastic_gpu_specifications`, `elastic_inference_accelerator`, `enclave_options`, `hibernation_options`, `iam_instance_profile`, `instance_market_options`, `instance_requirements`, `kernel_id`, `license_specification`, `maintenance_options`, `metadata_options`, `network_interfaces.associate_carrier_ip_address`, `network_interfaces.interface_type`, `network_interfaces.ipv4_address_count`, `network_interfaces.ipv4_addresses`, `network_interfaces.ipv4_prefix_count`, `network_interfaces.ipv4_prefixes`, `network_interfaces.ipv6_address_count`, `network_interfaces.ipv6_addresses`, `network_interfaces.ipv6_prefix_count`, `network_interfaces.ipv6_prefixes`, `network_interfaces.network_card_index`, `placement.host_resource_group_arn`, `placement.spread_domain`, `placement.partition_number`, `private_dns_name_options`, `ram_disk_id`, `security_group_names`.
 
 ## Import
 

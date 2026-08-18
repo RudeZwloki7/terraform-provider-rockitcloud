@@ -167,6 +167,7 @@ The following arguments are optional:
 * `tags` - (Optional) Map of tags to assign to the device.
 * `volume_size` - (Optional) Size of the volume in GiB.
 * `volume_type` - (Optional) Type of volume.
+* `encrypted` - (Optional) If the EBS volume is encrypted.
 
 ~> **Note** Currently, changes to the `ebs_block_device` configuration of _existing_ resources cannot be automatically detected by Terraform.
 To manage changes and attachments of an EBS block to an instance, use the [`aws_ebs_volume`](ebs_volume.md) and [`aws_volume_attachment`](volume_attachment.md) resources instead.
@@ -230,6 +231,7 @@ The `root_block_device` block has the following structure:
 * `tags` - (Optional) Map of tags to assign to the device.
 * `volume_size` - (Optional) Size of the volume in GiB.
 * `volume_type` - (Optional) Type of volume.
+* `encrypted` - (Optional) If the EBS volume is encrypted.
 
 ## Attribute Reference
 
@@ -265,7 +267,7 @@ For `root_block_device`, in addition to the arguments above, the following attri
 
 The following attributes are not currently supported:
 
-`capacity_reservation_specification`, `cpu_core_count`, `cpu_threads_per_core`, `credit_specification`, `ebs_block_device.encrypted`, `ebs_block_device.kms_key_id`, `ebs_block_device.throughput`, `ebs_optimized`, `enclave_options`, `get_password_data`, `hibernation`, `iam_instance_profile`, `ipv6_address_count`, `ipv6_addresses`, `maintenance_options`, `metadata_options`, `network_interface.network_card_index`, `outpost_arn`, `password_data`, `placement_partition_number`, `root_block_device.encrypted`, `root_block_device.kms_key_id`, `root_block_device.throughput`.
+`capacity_reservation_specification`, `cpu_core_count`, `cpu_threads_per_core`, `credit_specification`, `ebs_block_device.kms_key_id`, `ebs_block_device.throughput`, `ebs_optimized`, `enclave_options`, `get_password_data`, `hibernation`, `iam_instance_profile`, `ipv6_address_count`, `ipv6_addresses`, `maintenance_options`, `metadata_options`, `network_interface.network_card_index`, `outpost_arn`, `password_data`, `placement_partition_number`, `root_block_device.kms_key_id`, `root_block_device.throughput`.
 
 ## Timeouts
 
