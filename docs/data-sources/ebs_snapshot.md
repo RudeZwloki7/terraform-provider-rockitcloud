@@ -59,6 +59,7 @@ In addition to all arguments above, the following attributes are exported:
 
 * `arn` - (String) The Amazon Resource Name (ARN) of the snapshot.
 * `description` - (String) The description for the snapshot.
+* `encrypted` - (Boolean) If the snapshot is encrypted.
 * `id` - (String) The ID of the snapshot.
     * _Example:_ `snap-12345678`
 * `owner_alias` - (String) The alias of the snapshot owner.
@@ -70,7 +71,6 @@ In addition to all arguments above, the following attributes are exported:
 * `volume_id` - (String) The ID of the volume.
     * _Example:_ `vol-12345678`
 * `volume_size` - (Integer) The size of the volume in GiB.
-* `encrypted` - (Boolean) If the snapshot is encrypted.
 
 ### Unsupported attributes
 

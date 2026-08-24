@@ -65,6 +65,7 @@ The `ebs_block_device` block has the following structure:
     * _Valid values:_ `disk<N>`, `cdrom<N>`, `floppy<N>`, where `<N>` is a disk number
 * `delete_on_termination` - (Optional) Controls whether the EBS volumes will be deleted once the instance for which they were created is terminated.
     * _Default value:_ `true`
+* `encrypted` - (Optional) If the EBS volume is encrypted.
 * `iops` - (Optional) Number of I/O operations per second the
   created volumes will support.
     * _Constraints:_ Required if `volume_type` is `io2`
@@ -75,7 +76,6 @@ The `ebs_block_device` block has the following structure:
     * _Constraints:_ Required unless `snapshot_id` is set. If `snapshot_id` is set and `volume_size` is omitted then the volume will have the same size as the selected snapshot
 * `volume_type` - (Optional) The type of EBS volume to create.
     * _Default value:_ `st2`
-* `encrypted` - (Optional) If the EBS volume is encrypted.
 
 ### ephemeral_block_device
 

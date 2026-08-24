@@ -98,11 +98,11 @@ The `ebs_block_device` block has the following structure:
 
 * `delete_on_termination` - If the EBS volume will be deleted on termination.
 * `device_name` - The physical name of the device.
+* `encrypted` - If the EBS volume is encrypted.
 * `iops` - `0` if the EBS volume is not a provisioned IOPS image, otherwise the supported IOPS count.
 * `snapshot_id` - The ID of the snapshot.
 * `volume_size` - The size of the volume in GiB.
 * `volume_type` - The volume type.
-* `encrypted` - If the EBS volume is encrypted.
 
 #### ephemeral_block_device
 
@@ -118,10 +118,10 @@ The `root_block_device` block has the following structure:
 
 * `device_name` - The physical name of the device.
 * `delete_on_termination` - Indicates whether the root block device will be deleted on termination.
+* `encrypted` - If the EBS volume is encrypted.
 * `iops` - `0` if the volume is not a provisioned IOPS image, otherwise the supported IOPS count.
 * `volume_size` - The size of the volume in GiB.
 * `volume_type` - The type of the volume.
-* `encrypted` - If the EBS volume is encrypted.
 
 ### Unsupported attributes
 
