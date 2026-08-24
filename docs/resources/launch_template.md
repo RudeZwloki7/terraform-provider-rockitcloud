@@ -101,7 +101,7 @@ The `block_device_mappings` block has the following structure:
 The `ebs` block has the following structure:
 
 * `delete_on_termination` - (Optional) Indicates whether the volume should be destroyed on instance termination.
-* `encrypted` - (Optional) If the EBS volume is encrypted.
+* `encrypted` - (Optional) Indicates whether the EBS volume is encrypted.
 * `iops` - (Optional) The amount of provisioned IOPS.
     * _Constraints:_ This must be set with the volume_type of `io2`
 * `snapshot_id` - (Optional) The ID of the snapshot to mount.

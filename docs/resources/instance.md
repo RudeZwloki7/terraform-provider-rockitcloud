@@ -161,7 +161,7 @@ The following arguments are optional:
 
 * `delete_on_termination` - (Optional) Whether the volume should be destroyed on instance termination.
     * _Default value:_ `true`
-* `encrypted` - (Optional) If the EBS volume is encrypted.
+* `encrypted` - (Optional) Indicates whether the EBS volume is encrypted.
 * `iops` - (Optional) Amount of provisioned IOPS.
     * _Constraints:_ Only valid for the volume type `io2`
 * `snapshot_id` - (Optional) The ID of the snapshot to mount.
@@ -226,7 +226,7 @@ The `root_block_device` block has the following structure:
 
 * `delete_on_termination` - (Optional) Whether the volume should be destroyed on instance termination.
     * _Default value:_ `true`
-* `encrypted` - (Optional) If the EBS volume is encrypted.
+* `encrypted` - (Optional) Indicates whether the EBS volume is encrypted.
 * `iops` - (Optional) Amount of provisioned IOPS.
     * _Constraints:_ Only valid for volume_type of `io2`
 * `tags` - (Optional) Map of tags to assign to the device.
