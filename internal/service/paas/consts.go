@@ -15,7 +15,9 @@ const (
 )
 
 const (
-	ServiceNotFoundCode = "PaasServiceNotFound"
+	ServiceNotFoundCode      = "PaasServiceNotFound"
+	OperationNotAllowedCode  = "OperationNotAllowed"
+	ResourceDoesNotExistCode = "ResourceDoesNotExist"
 )
 
 const (

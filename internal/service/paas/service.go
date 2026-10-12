@@ -275,6 +275,13 @@ func ResourceService() *schema.Resource {
 					},
 				},
 			},
+			"instance_qty": {
+				Type:         schema.TypeInt,
+				Optional:     true,
+				Computed:     true,
+				ForceNew:     true,
+				ValidateFunc: validation.IntAtLeast(1),
+			},
 			"instance_type": {
 				Type:     schema.TypeString,
 				Required: true,
@@ -421,8 +428,10 @@ func ResourceService() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			services.ClickHouse.ServiceType():    services.ClickHouse.ResourceSchema(),
 			services.ELK.ServiceType():           services.ELK.ResourceSchema(),
 			services.ElasticSearch.ServiceType(): services.ElasticSearch.ResourceSchema(),
+			services.GitLab.ServiceType():        services.GitLab.ResourceSchema(),
 			services.Kafka.ServiceType():         services.Kafka.ResourceSchema(),
 			services.Memcached.ServiceType():     services.Memcached.ResourceSchema(),
 			services.MongoDB.ServiceType():       services.MongoDB.ResourceSchema(),
@@ -481,6 +490,10 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 		input.BackupSettings = expandBackupSettings(backupSettingsMap)
 	}
 
+	if v, ok := d.GetOk("instance_qty"); ok {
+		input.InstanceQty = aws.Int64(int64(v.(int)))
+	}
+
 	if _, ok := d.GetOk("data_volume"); ok {
 		input.DataVolumeType = aws.String(d.Get("data_volume.0.type").(string))
 		input.DataVolumeSize = aws.Int64(int64(d.Get("data_volume.0.size").(int)))
@@ -501,7 +514,7 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 	parametersMap := d.Get(manager.ServiceType()).([]interface{})[0].(map[string]interface{})
 	input.ServiceClass = aws.String(parametersMap["class"].(string))
 
-	input.Parameters = manager.ExpandServiceParameters(parametersMap)
+	input.Parameters = manager.ExpandServiceCreationParameters(parametersMap)
 
 	if v, ok := d.GetOk("ssh_key_name"); ok && v != "" {
 		input.SshKeyName = aws.String(v.(string))
@@ -543,7 +556,8 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 		return diag.Errorf("error waiting for PaaS Service (%s) to create: %s", id, err)
 	}
 
-	// Update to apply changes for service users and databases.
+	// Update to apply changes for service users, databases
+	// and parameters, that can't be set on service creation.
 	return resourceServiceUpdate(ctx, d, meta)
 }
 
@@ -607,6 +621,7 @@ func readService(d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	d.Set("high_availability", service.HighAvailability)
 
 	d.Set("instances", flattenInstances(service.Instances))
+	d.Set("instance_qty", service.InstanceQty)
 	d.Set("instance_type", service.InstanceType)
 	d.Set("nodes", flattenNodes(service.Nodes))
 
@@ -810,12 +825,13 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	if d.HasChange(serviceType) && !d.IsNewResource() {
+	parametersMap := d.Get(serviceType).([]interface{})[0].(map[string]interface{})
+
+	if d.HasChange(serviceType) && (!d.IsNewResource() || manager.HasDeferredParameters(parametersMap)) {
 		input := &paas.ModifyServiceParametersInput{
 			ServiceId: aws.String(id),
 		}
 
-		parametersMap := d.Get(serviceType).([]interface{})[0].(map[string]interface{})
 		input.Parameters = serviceParametersForUpdate(
 			serviceType,
 			manager.ExpandServiceParameters(parametersMap),

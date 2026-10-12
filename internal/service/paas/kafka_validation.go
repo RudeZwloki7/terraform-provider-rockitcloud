@@ -28,6 +28,11 @@ type kafkaServiceConfig struct {
 // Non-HA Kafka on K2 Cloud uses additional_roles = ["coordinator"] to combine broker and coordinator;
 // a dedicated coordinator block without additional_roles is rejected by the platform for single-node clusters.
 func validateKafkaServiceConfiguration(_ context.Context, d *schema.ResourceDiff, _ interface{}) error {
+	// ClickHouse also uses additional_roles and coordinator, but with its own rules.
+	if _, ok := d.GetOk(services.ClickHouse.ServiceType()); ok {
+		return validateClickHouseServiceConfiguration(d)
+	}
+
 	config := kafkaServiceConfig{}
 
 	if _, ok := d.GetOk(services.Kafka.ServiceType()); ok {
