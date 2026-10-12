@@ -42,6 +42,7 @@ In addition to all arguments above, the following attributes are exported:
 * `error_description` - The detailed description of the service error.
 * `high_availability` - Indicates whether this is a high-availability service.
 * `instances` - List of instances that refers to the service. The structure of this block is [described below](#instances).
+* `instance_qty` - The total number of service instances including coordinator instances.
 * `instance_type` - The instance type.
 * `name` - The service name.
 * `network_interface_ids` - List of network interface IDs.
@@ -50,8 +51,10 @@ In addition to all arguments above, the following attributes are exported:
 * `security_group_ids` - List of security group IDs that were specified for the service.
 * `service_class` - The service class.
 * `service_type` - The service type. This value determines which service parameters are included in the corresponding block.
+    * `clickhouse` - ClickHouse parameters. The structure of this block is [described below](#clickhouse-attribute-reference).
     * `elk` - ELK parameters. The structure of this block is [described below](#elk-attribute-reference).
     * `elasticsearch` - Elasticsearch parameters. The structure of this block is [described below](#elasticsearch-attribute-reference).
+    * `gitlab` - GitLab parameters. The structure of this block is [described below](#gitlab-attribute-reference).
     * `kafka` - Kafka parameters. The structure of this block is [described below](#kafka-attribute-reference).
     * `memcached` - Memcached parameters. The structure of this block is [described below](#memcached-attribute-reference).
     * `mongodb` - MongoDB parameters. The structure of this block is [described below](#mongodb-attribute-reference).
@@ -132,6 +135,49 @@ The `root_volume` block has the following structure:
 * `size` - The size of the root volume in GiB.
 * `type` - The type of the root volume.
 
+## ClickHouse Attribute Reference
+
+~> **Note** The following attributes contain default parameter values or user-defined values used when the service is created.
+
+In addition to the common attributes for all services [described above](#attribute-reference),
+the following attributes are exported only for a ClickHouse service:
+
+* `class` - The service class.
+* `database` - List of ClickHouse databases with parameters. The structure of this block is [described below](#clickhouse-database).
+* `logging` - The logging settings for the service. The structure of this block is [described below](#logging).
+* `monitoring` - The monitoring settings for the service. The structure of this block is [described below](#monitoring).
+* `options` - Advanced ClickHouse server settings.
+* `user` - List of ClickHouse users with parameters. The structure of this block is [described below](#clickhouse-user).
+* `version` - The installed version.
+
+### ClickHouse database
+
+The `database` block has the following structure:
+
+* `id` - The ID of the database.
+* `name` - The database name.
+
+### ClickHouse user
+
+The `user` block has the following structure:
+
+* `grants` - List of privileges granted to the user.
+* `id` - The ID of the user.
+* `name` - The ClickHouse user name.
+* `networks` - Networks from which the user can connect. The structure of this block is [described below](#clickhouse-user-networks).
+* `password` - The ClickHouse user password.
+* `password_type` - The password encoding.
+* `profile` - The name of the settings profile assigned to the user.
+* `quota` - The name of the quota assigned to the user.
+
+#### ClickHouse user networks
+
+The `networks` block has the following structure:
+
+* `host` - List of host names from which the user can connect.
+* `host_regexp` - List of regular expressions for host names from which the user can connect.
+* `ip` - List of IP addresses or subnets from which the user can connect.
+
 ## Elasticsearch Attribute Reference
 
 ~> **Note** The following attributes contain default parameter values or user-defined values used when the service is created.
@@ -167,6 +213,87 @@ the following attributes are exported only for an ELK service:
 ~> **Note** The live DescribeService API can omit `password` and `options`.
 Unlike an existing resource state, a data source cannot reconstruct create
 inputs that the API does not return.
+
+## GitLab Attribute Reference
+
+~> **Note** The following attributes contain default parameter values or user-defined values used when the service is created.
+
+In addition to the common attributes for all services [described above](#attribute-reference),
+the following attributes are exported only for a GitLab service:
+
+* `class` - The service class.
+* `external_url` - The URL for accessing GitLab.
+* `ldap` - The LDAP settings. The structure of this block is [described below](#gitlab-ldap).
+* `logging` - The logging settings for the service. The structure of this block is [described below](#logging).
+* `monitoring` - The monitoring settings for the service. The structure of this block is [described below](#monitoring).
+* `oidc` - The OIDC settings. The structure of this block is [described below](#gitlab-oidc).
+* `password` - The GitLab root user password.
+* `registry` - The Container Registry settings. The structure of this block is [described below](#gitlab-registry).
+* `smtp` - The SMTP settings. The structure of this block is [described below](#gitlab-smtp).
+
+### GitLab ldap
+
+The `ldap` block has the following structure:
+
+* `active_directory` - Indicates whether the LDAP server is Active Directory.
+* `allow_username_or_email_login` - Indicates whether login by username or email is allowed.
+* `base` - The search base.
+* `bind_dn` - The bind distinguished name.
+* `ca_cert` - The CA certificate content.
+* `ciphers` - The SSL ciphers.
+* `client_cert` - The client certificate content.
+* `client_key` - The client private key content.
+* `encryption` - The encryption method.
+* `host` - The LDAP server host.
+* `label` - The label of the login button.
+* `lowercase_usernames` - Indicates whether usernames are converted to lowercase.
+* `password` - The bind password.
+* `port` - The LDAP server port.
+* `retry_empty_result_with_codes` - List of response codes on which the empty result query is retried.
+* `ssl_version` - The SSL version.
+* `timeout` - The query timeout in seconds.
+* `uid` - The UID attribute.
+* `user_filter` - The user filter.
+* `verify_certificates` - Indicates whether SSL certificates are verified.
+
+### GitLab oidc
+
+The `oidc` block has the following structure:
+
+* `client_auth_method` - The client authentication method.
+* `client_id` - The client ID.
+* `client_secret` - The client secret.
+* `issuer` - The URL of the OIDC provider.
+* `label` - The label of the login button.
+* `pkce` - Indicates whether PKCE is enabled.
+* `send_scope_to_token_endpoint` - Indicates whether scope is sent to the token endpoint.
+* `uid_field` - The name of the field for UID.
+
+### GitLab registry
+
+The `registry` block has the following structure:
+
+* `bucket` - The name of the bucket in object storage where the Container Registry data is saved.
+* `s3_user` - The login of a user with permissions to the bucket in object storage.
+* `storage` - The storage type.
+* `url` - The object storage endpoint URL.
+
+### GitLab smtp
+
+The `smtp` block has the following structure:
+
+* `address` - The SMTP server address.
+* `authentication` - The SMTP authentication method.
+* `domain` - The SMTP domain.
+* `email_from` - The email sender address.
+* `email_reply_to` - The email reply-to address.
+* `force_tls` - Indicates whether TLS is forced.
+* `password` - The SMTP password.
+* `port` - The SMTP server port.
+* `starttls_auto` - Indicates whether STARTTLS is enabled automatically.
+* `tls` - Indicates whether TLS is used immediately.
+* `tls_verify_mode` - The TLS certificate verification mode.
+* `username` - The SMTP username.
 
 ## Memcached Attribute Reference
 
