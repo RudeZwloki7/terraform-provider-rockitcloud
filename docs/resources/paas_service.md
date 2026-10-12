@@ -781,6 +781,9 @@ The following arguments are optional:
     * _Valid values:_ `coordinator`
     * _Constraints:_ Supported only for [ClickHouse] and [Kafka]. Cannot be used together with `coordinator`.
       For [ClickHouse], set the value to `["coordinator"]` to create a standalone service or a cluster of combined nodes.
+* `auto_disk_expansion` - (Optional) The auto volume expansion settings for the service.
+  The structure of this block is [described below](#auto_disk_expansion).
+    * _Constraints:_ Requires `data_volume`. The service must support the `common:auto_disk_expansion` feature
 * `backup_settings` - (Optional) The backup settings for the service. The structure of this block is [described below](#backup_settings).
   The parameter is supported only for [MySQL] and [PostgreSQL] services.
 * `coordinator` - (Optional, ForceNew) Dedicated coordinator node parameters. The structure of this block is [described below](#coordinator).
@@ -823,6 +826,28 @@ One of the following blocks with service parameters must be specified:
 * `rabbitmq` - RabbitMQ parameters. The structure of this block is [described below](#rabbitmq-argument-reference).
 * `redis` - Redis parameters. The structure of this block is [described below](#redis-argument-reference).
 
+### auto_disk_expansion
+
+~> **Note** All the parameters in the `auto_disk_expansion` block are editable.
+If the block is removed from the configuration, auto volume expansion is disabled for the service.
+
+The `auto_disk_expansion` block has the following structure:
+
+* `condition_value` - (Required) The utilization level of the data volume (in percent), upon exceeding which,
+  within 10 minutes on at least one node, automatic expansion is triggered.
+    * _Valid values:_ From 70 to 90
+* `enabled` - (Optional) Indicates whether auto volume expansion is enabled.
+    * _Default value:_ `true`
+* `max_size_gb` - (Required) The limit in GiB up to which the volume can be increased.
+    * _Valid values:_ From 8, multiples of 8
+    * _Constraints:_ The value must be greater than the current size of the data volume and must not exceed the preset cloud limit
+
+~> **Note** The cloud increases the data volume by 20% at a time. If `enabled` is `true` and the actual data volume size
+is greater than `data_volume.size`, Terraform does not show the difference. To increase the volume manually,
+set `data_volume.size` to a value greater than the actual size.
+When the data volume reaches `max_size_gb`, the cloud disables auto volume expansion.
+To enable it again, increase `max_size_gb`.
+
 ### backup_settings
 
 ~> **Note** All the parameters in the `backup_settings` block are editable.
@@ -850,6 +875,7 @@ The `data_volume` block has the following structure:
 * `size` - (Optional) The size of the data volume in GiB.
     * _Default value:_ `32`
     * _Constraints:_ For [Kafka], the minimum value is `64`
+    * _Constraints:_ If `auto_disk_expansion` is enabled, the difference is not shown when the actual size is greater
 * `type` - (Optional) The type of the data volume.
     * _Default value:_ `st2`
 
@@ -1689,6 +1715,10 @@ In addition to all arguments above, the following attributes are exported:
 * `total_cpu_count` - Total number of CPU cores in use.
 * `total_memory` - Total RAM in use in MiB.
 * `vpc_id` - The ID of the VPC.
+
+For `auto_disk_expansion` the following attribute is also exported:
+
+* `status` - The current status of auto volume expansion (`active`, `warning`, `running` or `failed`).
 
 For `backup_settings` the following attribute is also exported:
 
