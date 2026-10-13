@@ -229,8 +229,11 @@ func TestResourceNodeGroupK2SchemaAndLabelValidation(t *testing.T) {
 	}
 
 	minSize := resource.Schema["scaling_config"].Elem.(*schema.Resource).Schema["min_size"]
-	if _, errors := minSize.ValidateFunc(0, "min_size"); len(errors) == 0 {
-		t.Fatal("min_size=0 must be rejected")
+	if _, errors := minSize.ValidateFunc(0, "min_size"); len(errors) != 0 {
+		t.Fatalf("min_size=0 must be accepted: %v", errors)
+	}
+	if _, errors := minSize.ValidateFunc(-1, "min_size"); len(errors) == 0 {
+		t.Fatal("min_size=-1 must be rejected")
 	}
 
 	valid := map[string]interface{}{
