@@ -162,7 +162,7 @@ The following arguments are optional:
 
 * `desired_size` - (Required) Desired number of worker nodes.
 * `max_size` - (Required) Maximum number of worker nodes.
-* `min_size` - (Required) Minimum number of worker nodes. Must be at least `1`.
+* `min_size` - (Required) Minimum number of worker nodes. Must be at least `0`.
 
 ### taint
 

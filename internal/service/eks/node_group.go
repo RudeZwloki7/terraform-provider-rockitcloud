@@ -260,7 +260,7 @@ func ResourceNodeGroup() *schema.Resource {
 						"min_size": {
 							Type:         schema.TypeInt,
 							Required:     true,
-							ValidateFunc: validation.IntAtLeast(1),
+							ValidateFunc: validation.IntAtLeast(0),
 						},
 					},
 				},
