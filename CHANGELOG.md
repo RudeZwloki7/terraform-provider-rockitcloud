@@ -1,5 +1,9 @@
 ## 26.1.0 (Unreleased)
 
+ENHANCEMENTS:
+
+* resource/aws_eks_node_group: allow `scaling_config.min_size` to be `0` ([#195](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/195))
+
 ## 26.0.0 (October 05, 2026)
 
 BREAKING CHANGES:
