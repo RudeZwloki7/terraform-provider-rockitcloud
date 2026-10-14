@@ -108,6 +108,33 @@ func TestValidateClickHouseServiceConfig(t *testing.T) {
 			expectErr: true,
 		},
 		{
+			name:   "standalone allows a single node",
+			config: clickHouseServiceConfig{hasCoordinatorRole: true, instanceQty: 1},
+		},
+		{
+			name:      "standalone rejects several nodes",
+			config:    clickHouseServiceConfig{hasCoordinatorRole: true, instanceQty: 3},
+			expectErr: true,
+		},
+		{
+			name:   "combined cluster allows three nodes",
+			config: clickHouseServiceConfig{highAvailability: true, hasCoordinatorRole: true, instanceQty: 3},
+		},
+		{
+			name:      "combined cluster rejects sixteen nodes",
+			config:    clickHouseServiceConfig{highAvailability: true, hasCoordinatorRole: true, instanceQty: 16},
+			expectErr: true,
+		},
+		{
+			name:   "dedicated keepers allow six nodes",
+			config: clickHouseServiceConfig{highAvailability: true, hasCoordinatorBlock: true, instanceQty: 6},
+		},
+		{
+			name:      "dedicated keepers reject five nodes",
+			config:    clickHouseServiceConfig{highAvailability: true, hasCoordinatorBlock: true, instanceQty: 5},
+			expectErr: true,
+		},
+		{
 			name: "standalone rejects dedicated coordinator block",
 			config: clickHouseServiceConfig{
 				hasCoordinatorBlock: true,
