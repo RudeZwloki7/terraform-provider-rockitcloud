@@ -164,7 +164,7 @@ func (s service) databaseSchema(databaseParametersSchema map[string]*schema.Sche
 		}
 	}
 
-	if s.usersEnabled {
+	if s.usersEnabled && !s.noDatabaseUsers {
 		databaseSchema["user"] = s.userSchema(s.toInterface().databaseUserParametersSchema())
 	}
 
@@ -332,7 +332,7 @@ func (s service) databaseDataSourceSchema(databaseParametersSchema map[string]*s
 		}
 	}
 
-	if s.usersEnabled {
+	if s.usersEnabled && !s.noDatabaseUsers {
 		databaseSchema["user"] = s.userDataSourceSchema(s.toInterface().databaseUserParametersDataSourceSchema())
 	}
 

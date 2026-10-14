@@ -6,8 +6,10 @@ import (
 )
 
 const (
+	ServiceTypeClickHouse    = "clickhouse"
 	ServiceTypeELK           = "elk"
 	ServiceTypeElasticSearch = "elasticsearch"
+	ServiceTypeGitLab        = "gitlab"
 	ServiceTypeKafka         = "kafka"
 	ServiceTypeMemcached     = "memcached"
 	ServiceTypeMongoDB       = "mongodb"
@@ -20,8 +22,10 @@ const (
 
 func ServiceTypeValues() []string {
 	return []string{
+		ServiceTypeClickHouse,
 		ServiceTypeELK,
 		ServiceTypeElasticSearch,
+		ServiceTypeGitLab,
 		ServiceTypeKafka,
 		ServiceTypeMemcached,
 		ServiceTypeMongoDB,
@@ -36,6 +40,7 @@ func ServiceTypeValues() []string {
 const (
 	ServiceClassCacher        = "cacher"
 	ServiceClassDatabase      = "database"
+	ServiceClassDevelopment   = "development"
 	ServiceClassLogging       = "logging"
 	ServiceClassMessageBroker = "message_broker"
 	ServiceClassMonitoring    = "monitoring"
@@ -46,6 +51,7 @@ func ServiceClassValues() []string {
 	return []string{
 		ServiceClassCacher,
 		ServiceClassDatabase,
+		ServiceClassDevelopment,
 		ServiceClassLogging,
 		ServiceClassMessageBroker,
 		ServiceClassMonitoring,
@@ -103,8 +109,10 @@ func parseBytes(value int64, dimension string) (int64, error) {
 
 // Map with ServiceManager objects for each supported PaaS service.
 var managers = map[string]ServiceManager{
+	ClickHouse.ServiceType():    ClickHouse,
 	ELK.ServiceType():           ELK,
 	ElasticSearch.ServiceType(): ElasticSearch,
+	GitLab.ServiceType():        GitLab,
 	Kafka.ServiceType():         Kafka,
 	Memcached.ServiceType():     Memcached,
 	MongoDB.ServiceType():       MongoDB,

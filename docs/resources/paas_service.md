@@ -27,8 +27,10 @@ description: |-
 [technical support]: https://support.k2int.ru/app/#/project/CS
 [timeouts]: https://developer.hashicorp.com/terraform/plugin/framework/resources/timeouts
 
+[ClickHouse]: #clickhouse-argument-reference
 [ELK]: #elk-argument-reference
 [Elasticsearch]: #elasticsearch-argument-reference
+[GitLab]: #gitlab-argument-reference
 [Kafka]: #kafka-argument-reference
 [Memcached]: #memcached-argument-reference
 [MongoDB]: #mongodb-argument-reference
@@ -121,6 +123,145 @@ resource "aws_paas_service" "elasticsearch" {
   elasticsearch {
     version = "8.12"
     kibana  = true
+  }
+}
+```
+
+### ClickHouse service
+
+~> **Note** This example uses the VPC, subnet, internet gateway, NAT gateway and default route defined in the [Elasticsearch service example](#elasticsearch-service).
+
+```terraform
+resource "aws_paas_service" "clickhouse" {
+  depends_on = [aws_route.default_route]
+
+  name          = "tf-service"
+  instance_type = "c5.large"
+
+  additional_roles = ["coordinator"]
+
+  root_volume {
+    type = "gp2"
+    size = 32
+  }
+
+  data_volume {
+    type = "gp2"
+    size = 32
+  }
+
+  delete_interfaces_on_destroy = true
+  security_group_ids           = [aws_vpc.example.default_security_group_id]
+  subnet_ids                   = [aws_subnet.example.id]
+
+  ssh_key_name = "<name>"
+
+  clickhouse {
+    version = "25.3"
+
+    database {
+      name = "test_db"
+    }
+
+    user {
+      name     = "test_user"
+      password = "********"
+      grants   = ["GRANT SELECT ON test_db.*"]
+
+      networks {
+        ip = ["172.16.0.0/16"]
+      }
+    }
+  }
+}
+```
+
+### ClickHouse cluster with dedicated keepers
+
+~> **Note** This example uses the VPC, subnet, internet gateway, NAT gateway and default route defined in the [Elasticsearch service example](#elasticsearch-service).
+
+```terraform
+resource "aws_paas_service" "clickhouse" {
+  depends_on = [aws_route.default_route]
+
+  name          = "tf-service"
+  instance_type = "c5.large"
+
+  high_availability = true
+  instance_qty      = 6
+
+  root_volume {
+    type = "gp2"
+    size = 32
+  }
+
+  data_volume {
+    type = "gp2"
+    size = 32
+  }
+
+  coordinator {
+    instance_type    = "c5.large"
+    root_volume_type = "gp2"
+    root_volume_size = 32
+  }
+
+  delete_interfaces_on_destroy = true
+  security_group_ids           = [aws_vpc.example.default_security_group_id]
+  subnet_ids                   = [aws_subnet.example.id]
+
+  ssh_key_name = "<name>"
+
+  clickhouse {
+    version = "25.3"
+  }
+}
+```
+
+### GitLab service
+
+GitLab requires an instance with at least 2 vCPUs and 8 GiB of memory.
+
+~> **Note** This example uses the VPC, subnet, internet gateway, NAT gateway and default route defined in the [Elasticsearch service example](#elasticsearch-service).
+
+```terraform
+resource "aws_paas_service" "gitlab" {
+  depends_on = [aws_route.default_route]
+
+  name          = "tf-service"
+  instance_type = "m5.large"
+
+  root_volume {
+    type = "gp2"
+    size = 32
+  }
+
+  data_volume {
+    type = "gp2"
+    size = 64
+  }
+
+  delete_interfaces_on_destroy = true
+  security_group_ids           = [aws_vpc.example.default_security_group_id]
+  subnet_ids                   = [aws_subnet.example.id]
+
+  ssh_key_name = "<name>"
+
+  gitlab {
+    password = "********"
+
+    registry {
+      storage = "filesystem"
+    }
+
+    smtp {
+      address        = "smtp.gitlab.invalid"
+      port           = 587
+      username       = "gitlab@gitlab.invalid"
+      password       = "********"
+      authentication = "login"
+      email_from     = "gitlab@gitlab.invalid"
+    }
   }
 }
 ```
@@ -636,22 +777,27 @@ The following arguments are optional:
     * _Default value:_ `false`
     * _Constraints:_ The parameter can be set to `true` only if `high_availability` is `true`
       The parameter is supported only for [ELK], [Elasticsearch], [MongoDB], [MySQL] and [PostgreSQL] services.
-* `additional_roles` - (Optional, ForceNew) Additional roles for broker nodes.
+* `additional_roles` - (Optional, ForceNew) Additional roles for the main service nodes (broker nodes for [Kafka]).
     * _Valid values:_ `coordinator`
-    * _Constraints:_ Supported only for [Kafka]. Cannot be used together with `coordinator`.
+    * _Constraints:_ Supported only for [ClickHouse] and [Kafka]. Cannot be used together with `coordinator`.
+      For [ClickHouse], set the value to `["coordinator"]` to create a standalone service or a cluster of combined nodes.
 * `backup_settings` - (Optional) The backup settings for the service. The structure of this block is [described below](#backup_settings).
   The parameter is supported only for [MySQL] and [PostgreSQL] services.
 * `coordinator` - (Optional, ForceNew) Dedicated coordinator node parameters. The structure of this block is [described below](#coordinator).
-    * _Constraints:_ Supported only for [Kafka]. Cannot be used together with `additional_roles`.
+    * _Constraints:_ Supported only for [ClickHouse] and [Kafka]. Cannot be used together with `additional_roles`.
+      For [ClickHouse], the block is used to create a cluster with dedicated keepers.
 * `data_volume` - (Optional) The data volume parameters for the service. The structure of this block is [described below](#data_volume).
-  The provider schema requires this parameter for [ELK], [Elasticsearch], [Kafka], [Memcached], [MongoDB], [MySQL], [PostgreSQL],
-  [Prometheus], [RabbitMQ] and [Redis] services.
+  The provider schema requires this parameter for [ClickHouse], [ELK], [Elasticsearch], [GitLab], [Kafka], [Memcached], [MongoDB],
+  [MySQL], [PostgreSQL], [Prometheus], [RabbitMQ] and [Redis] services.
 * `delete_interfaces_on_destroy` - (Optional) Indicates whether to delete the instance network interfaces when the service is destroyed.
     * _Default value:_ `false`
 * `high_availability` - (Optional) Indicates whether to create a high availability service.
-  The parameter is supported only for [ELK], [Elasticsearch], [Kafka], [MongoDB], [MySQL], [PostgreSQL], [RabbitMQ] and [Redis] services.
-  For [Prometheus], the value must remain `false`.
+  The parameter is supported only for [ClickHouse], [ELK], [Elasticsearch], [Kafka], [MongoDB], [MySQL], [PostgreSQL], [RabbitMQ]
+  and [Redis] services. For [Prometheus], the value must remain `false`.
     * _Default value:_ `false`
+* `instance_qty` - (Optional, ForceNew) The total number of service instances including coordinator instances.
+  The parameter can be set only if `high_availability` is `true`.
+  If the parameter is not specified, the default number of instances for the service type is used.
 * `network_interface_ids` - (Optional) List of network interface IDs.
     * _Constraints:_ Required if `subnet_ids` is not specified
 * `subnet_ids` - (Optional) List of subnet IDs.
@@ -664,8 +810,10 @@ The following arguments are optional:
 
 One of the following blocks with service parameters must be specified:
 
+* `clickhouse` - ClickHouse parameters. The structure of this block is [described below](#clickhouse-argument-reference).
 * `elk` - ELK parameters. The structure of this block is [described below](#elk-argument-reference).
 * `elasticsearch` - Elasticsearch parameters. The structure of this block is [described below](#elasticsearch-argument-reference).
+* `gitlab` - GitLab parameters. The structure of this block is [described below](#gitlab-argument-reference).
 * `kafka` - Kafka parameters. The structure of this block is [described below](#kafka-argument-reference).
 * `memcached` - Memcached parameters. The structure of this block is [described below](#memcached-argument-reference).
 * `mongodb` - MongoDB parameters. The structure of this block is [described below](#mongodb-argument-reference).
@@ -731,6 +879,80 @@ The `root_volume` block has the following structure:
 * `type` - (Optional) The type of the root volume.
     * _Default value:_ `st2`
 
+## ClickHouse argument reference
+
+In addition to the common arguments for all services [described above](#argument-reference),
+the `clickhouse` block can contain the following arguments:
+
+* `class` - (Optional) The service class.
+    * _Valid values:_ `database`
+    * _Default value:_ `database`
+* `database` - (Optional, Editable) List of ClickHouse databases with parameters. The structure of this block is [described below](#clickhouse-database).
+* `logging` - (Optional, Editable) The logging settings for the service. The structure of this block is [described below](#logging).
+* `monitoring` - (Optional, Editable) The monitoring settings for the service. The structure of this block is [described below](#monitoring).
+* `options` - (Optional, Editable) Map containing advanced ClickHouse server settings. Values are strings.
+* `user` - (Optional, Editable) List of ClickHouse users with parameters. The structure of this block is [described below](#clickhouse-user).
+* `version` - (Required) The version to install. Only LTS versions are available.
+  The list of supported versions is available in the [user documentation][paas].
+
+ClickHouse profiles, quotas and shards are managed by the
+[`aws_paas_clickhouse_profile`](paas_clickhouse_profile.md), [`aws_paas_clickhouse_quota`](paas_clickhouse_quota.md)
+and [`aws_paas_clickhouse_shard`](paas_clickhouse_shard.md) resources.
+
+### ClickHouse database
+
+~> **Note** All the parameters in the `database` block are editable.
+
+The `database` block has the following structure:
+
+* `name` - (Required) The database name. The value must start with a Latin letter, contain at most 63 characters,
+  and can only contain Latin letters, numbers and underscores (_).
+  The value must not be `default`, `readonly`, `system` and `information_schema`.
+
+### ClickHouse user
+
+~> **Note** All the parameters in the `user` block are editable.
+
+The `user` block has the following structure:
+
+* `grants` - (Optional) List of `GRANT` statements without grantees (e.g. `GRANT SELECT ON db.*`).
+* `name` - (Required) The ClickHouse user name. The value must start with a Latin letter, contain at most 63 characters,
+  and can only contain Latin letters, numbers and underscores (_).
+  The value must not be `default` and `cluster_user`.
+* `networks` - (Optional) Networks from which the user can connect. The structure of this block is [described below](#clickhouse-user-networks).
+* `password` - (Optional) The ClickHouse user password.
+* `password_type` - (Optional) The password encoding.
+    * _Valid values:_ `double_sha1`
+    * _Default value:_ `double_sha1`
+* `profile` - (Optional) The name of the settings profile assigned to the user.
+  It can be a built-in profile (`default`, `readonly`) or an existing profile created with the `aws_paas_clickhouse_profile` resource.
+    * _Default value:_ `default`
+* `quota` - (Optional) The name of the quota assigned to the user.
+  It can be a built-in quota (`default`) or an existing quota created with the `aws_paas_clickhouse_quota` resource.
+    * _Default value:_ `default`
+
+~> **Note** An omitted or empty `grants` list selects the backend defaults, which can include broad privileges
+for [ClickHouse XML users](https://github.com/ClickHouse/ClickHouse/blob/25.3/src/Access/UsersConfigAccessStorage.cpp).
+To give a user no table privileges, use an explicit non-empty list such as `grants = ["GRANT USAGE ON *.*"]`.
+`USAGE` is an alias of the [`NONE` privilege](https://clickhouse.com/docs/reference/statements/grant#none).
+
+~> **Note** Custom profile and quota resources depend on their parent service through `service_id`.
+First apply the service with built-in user assignments and create the child resources.
+Then set `profile` and `quota` to their existing names as literal strings and apply again.
+Referencing child resource attributes from the same parent service creates a Terraform dependency cycle.
+
+~> **Note** K2 Cloud rejects deletion of a profile or quota while it is assigned to a user.
+Before removing these child resources or running `terraform destroy`, change all affected user assignments
+to existing alternatives such as `default` and apply that change first.
+
+#### ClickHouse user networks
+
+The `networks` block has the following structure:
+
+* `host` - (Optional) List of host names from which the user can connect.
+* `host_regexp` - (Optional) List of regular expressions for host names from which the user can connect.
+* `ip` - (Optional) List of IP addresses or subnets from which the user can connect.
+
 ## Elasticsearch argument reference
 
 In addition to the common arguments for all services [described above](#argument-reference),
@@ -795,6 +1017,128 @@ the K2 Cloud ELK service, and the service is itself a logging destination.
 place. The live API can omit `password` and `options` from DescribeService.
 Terraform preserves them in an existing resource state, but a fresh import
 cannot recover values that the API does not return.
+
+## GitLab argument reference
+
+K2 Cloud provides GitLab CE (Community Edition) with a single master node.
+`high_availability` must be `false`. The subnet must have internet access for
+service installation. See the [K2 Cloud GitLab documentation](https://docs.k2.cloud/ru/services/paas/development/index.html).
+
+In addition to the common arguments for all services [described above](#argument-reference),
+the `gitlab` block can contain the following arguments:
+
+* `class` - (Optional) The service class.
+    * _Valid values:_ `development`
+    * _Default value:_ `development`
+* `ldap` - (Optional, Editable) The LDAP settings. If the block is specified, LDAP is enabled.
+  The structure of this block is [described below](#gitlab-ldap).
+* `logging` - (Optional, Editable) The logging settings for the service. The structure of this block is [described below](#logging).
+* `monitoring` - (Optional, Editable) The monitoring settings for the service. The structure of this block is [described below](#monitoring).
+* `oidc` - (Optional, Editable) The OIDC settings. If the block is specified, OIDC is enabled.
+  The structure of this block is [described below](#gitlab-oidc).
+* `password` - (Required) The initial GitLab root user password. Changing this argument recreates the service.
+  The value must be 8 to 128 characters long and must not contain `'`, `"`, `` ` `` and `\`.
+* `registry` - (Optional, Editable) The Container Registry settings. If the block is specified, Container Registry is enabled.
+  The structure of this block is [described below](#gitlab-registry).
+* `smtp` - (Optional, Editable) The SMTP settings. If the block is specified, SMTP is enabled.
+  The structure of this block is [described below](#gitlab-smtp).
+
+~> **Note** The `ldap`, `oidc` and `smtp` settings cannot be set on the service creation,
+so they are applied by modifying the service right after it is created.
+
+### GitLab ldap
+
+~> **Note** All the parameters in the `ldap` block are editable.
+
+The `ldap` block has the following structure:
+
+* `active_directory` - (Optional) Indicates whether the LDAP server is Active Directory.
+* `allow_username_or_email_login` - (Optional) Indicates whether login by username or email is allowed.
+* `base` - (Required) The search base.
+* `bind_dn` - (Optional) The bind distinguished name.
+* `ca_cert` - (Optional) The CA certificate content.
+* `ciphers` - (Optional) The SSL ciphers.
+* `client_cert` - (Optional) The client certificate content.
+* `client_key` - (Optional) The client private key content.
+* `encryption` - (Required) The encryption method.
+    * _Valid values:_ `start_tls`, `simple_tls`, `plain`
+* `host` - (Required) The LDAP server host.
+* `label` - (Required) The label of the login button.
+* `lowercase_usernames` - (Optional) Indicates whether usernames are converted to lowercase.
+* `password` - (Optional) The bind password.
+* `port` - (Required) The LDAP server port.
+    * _Valid values:_ From 1 to 65535
+* `retry_empty_result_with_codes` - (Optional) List of response codes on which the empty result query is retried.
+* `ssl_version` - (Optional) The SSL version.
+    * _Valid values:_ `TLSv1_1`, `TLSv1_2`, `TLSv1_3`
+* `timeout` - (Optional) The query timeout in seconds.
+    * _Valid values:_ From 0 to 60
+    * _Default value:_ `10`
+* `uid` - (Required) The non-empty LDAP attribute used to identify a user, such as `uid` for OpenLDAP or `sAMAccountName` for Active Directory.
+  Set the attribute used by your directory explicitly; the provider does not infer a default.
+* `user_filter` - (Optional) The user filter.
+* `verify_certificates` - (Optional) Indicates whether SSL certificates are verified.
+
+### GitLab oidc
+
+~> **Note** All the parameters in the `oidc` block are editable.
+
+The `oidc` block has the following structure:
+
+* `client_auth_method` - (Optional) The client authentication method.
+    * _Valid values:_ `query`, `basic`
+* `client_id` - (Optional) The client ID.
+* `client_secret` - (Optional) The client secret.
+* `issuer` - (Required) The URL of the OIDC provider.
+* `label` - (Optional) The label of the login button.
+    * _Default value:_ `OpenID Connect`
+* `pkce` - (Optional) Indicates whether PKCE is enabled.
+* `send_scope_to_token_endpoint` - (Optional) Indicates whether scope is sent to the token endpoint.
+    * _Default value:_ `true`
+* `uid_field` - (Optional) The name of the field for UID.
+    * _Default value:_ `sub`
+
+### GitLab registry
+
+~> **Note** All the parameters in the `registry` block are editable.
+
+The `registry` block has the following structure:
+
+* `bucket` - (Optional) The name of the bucket in object storage where the Container Registry data is saved.
+  The parameter must be set if `storage` is `s3`.
+* `s3_user` - (Optional) The login of a user with permissions to the bucket in object storage.
+  The parameter must be set if `storage` is `s3`.
+* `storage` - (Optional) The storage type. The value cannot be changed while Container Registry is enabled.
+  To change the storage type, first remove the `registry` block and apply the configuration, then add the block with the new storage type and apply again.
+  Changing the storage type does not copy existing images. Migrate Registry data separately as described in the [GitLab documentation](https://docs.gitlab.com/administration/packages/container_registry/#migrate-to-object-storage-without-downtime).
+    * _Valid values:_ `filesystem`, `s3`
+    * _Default value:_ `filesystem`
+* `url` - (Optional) The object storage endpoint URL.
+  If the parameter is not specified and `storage` is `s3`, the cloud object storage endpoint is used.
+
+### GitLab smtp
+
+~> **Note** All the parameters in the `smtp` block are editable.
+
+The `smtp` block has the following structure:
+
+* `address` - (Required) The SMTP server address.
+* `authentication` - (Required) The SMTP authentication method. Required by the K2 Cloud API even when credentials are omitted.
+    * _Valid values:_ `plain`, `login`
+* `domain` - (Optional) The SMTP domain.
+* `email_from` - (Optional) The email sender address.
+* `email_reply_to` - (Optional) The email reply-to address.
+* `force_tls` - (Optional) Indicates whether TLS is forced. The parameter can be set only if `tls` is `false`.
+* `password` - (Optional) The SMTP password.
+* `port` - (Required) The SMTP server port.
+    * _Valid values:_ From 1 to 65535
+* `starttls_auto` - (Optional) Indicates whether STARTTLS is enabled automatically.
+  The parameter can be set only if `tls` is `false`.
+* `tls` - (Optional) Indicates whether TLS is used immediately.
+    * _Default value:_ `false`
+* `tls_verify_mode` - (Optional) The TLS certificate verification mode.
+    * _Valid values:_ `none`, `peer`
+* `username` - (Optional) The SMTP username.
 
 ## Memcached argument reference
 
@@ -1341,6 +1685,10 @@ For `*.database` the following attribute is also exported:
 For `*.user` the following attribute is also exported:
 
 * `id` - The ID of the user.
+
+For `gitlab` the following attribute is also exported:
+
+* `external_url` - The URL for accessing GitLab.
 
 ### endpoints
 

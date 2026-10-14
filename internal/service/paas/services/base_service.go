@@ -22,6 +22,11 @@ type service struct {
 	databasesEnabled   bool
 	loggingEnabled     bool
 	monitoringEnabled  bool
+	// noDatabaseUsers disables database users for service with enabled users.
+	noDatabaseUsers bool
+	// deferredParameters holds terraform names of service-specific parameters,
+	// that can't be set on service creation and are set after it.
+	deferredParameters []string
 }
 
 // Interface schemaBuilder provides methods for building resource and datasource schemas for service.
@@ -49,6 +54,8 @@ type schemaBuilder interface {
 // Private methods and ExpandServiceParameters are used to convert different types of service-specific parameters.
 type converter interface {
 	ExpandServiceParameters(map[string]interface{}) ServiceParameters
+	ExpandServiceCreationParameters(map[string]interface{}) ServiceParameters
+	HasDeferredParameters(map[string]interface{}) bool
 	ExpandUsers([]interface{}, bool) []*paas.UserCreateRequest
 	ExpandUser(map[string]interface{}, bool) *paas.UserCreateRequest
 	ExpandDatabases([]interface{}) []*paas.DatabaseCreateRequest

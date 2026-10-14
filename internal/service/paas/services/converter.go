@@ -58,6 +58,37 @@ func (s service) ExpandServiceParameters(tfMap map[string]interface{}) ServicePa
 	return serviceParameters
 }
 
+// ExpandServiceCreationParameters converts terraform representation of service parameters
+// to api representation excluding parameters, that can't be set on service creation.
+func (s service) ExpandServiceCreationParameters(tfMap map[string]interface{}) ServiceParameters {
+	if tfMap == nil {
+		return nil
+	}
+
+	creationMap := make(map[string]interface{}, len(tfMap))
+	for k, v := range tfMap {
+		creationMap[k] = v
+	}
+
+	for _, k := range s.deferredParameters {
+		delete(creationMap, k)
+	}
+
+	return s.toInterface().ExpandServiceParameters(creationMap)
+}
+
+// HasDeferredParameters reports whether terraform representation of service parameters
+// contains parameter blocks, that can't be set on service creation.
+func (s service) HasDeferredParameters(tfMap map[string]interface{}) bool {
+	for _, k := range s.deferredParameters {
+		if v, ok := tfMap[k].([]interface{}); ok && len(v) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ExpandUsers converts terraform representation of list of users to api representation.
 func (s service) ExpandUsers(tfList []interface{}, forDatabase bool) []*paas.UserCreateRequest {
 	if len(tfList) == 0 {
@@ -340,7 +371,7 @@ func (s service) FlattenDatabase(database *paas.DatabaseResponse) map[string]int
 		tfMap["name"] = v
 	}
 
-	if v := database.Users; v != nil {
+	if v := database.Users; v != nil && !s.noDatabaseUsers {
 		tfMap["user"] = s.toInterface().FlattenUsers(database.Users, true)
 	}
 

@@ -1637,6 +1637,9 @@ func Provider() *schema.Provider {
 			// "aws_route53_resolver_rule_association":                route53resolver.ResourceRuleAssociation(),
 
 			"aws_paas_backup":                          paas.ResourceBackup(),
+			"aws_paas_clickhouse_profile":              paas.ResourceClickHouseProfile(),
+			"aws_paas_clickhouse_quota":                paas.ResourceClickHouseQuota(),
+			"aws_paas_clickhouse_shard":                paas.ResourceClickHouseShard(),
 			"aws_paas_logstash_pipeline":               paas.ResourceLogstashPipeline(),
 			"aws_paas_prometheus_notification_channel": paas.ResourcePrometheusNotificationChannel(),
 			"aws_paas_prometheus_route":                paas.ResourcePrometheusRoute(),

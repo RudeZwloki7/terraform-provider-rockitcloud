@@ -211,6 +211,10 @@ func DataSourceService() *schema.Resource {
 					},
 				},
 			},
+			"instance_qty": {
+				Type:     schema.TypeInt,
+				Computed: true,
+			},
 			"instance_type": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -319,8 +323,10 @@ func DataSourceService() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			services.ClickHouse.ServiceType():    services.ClickHouse.DataSourceSchema(),
 			services.ELK.ServiceType():           services.ELK.DataSourceSchema(),
 			services.ElasticSearch.ServiceType(): services.ElasticSearch.DataSourceSchema(),
+			services.GitLab.ServiceType():        services.GitLab.DataSourceSchema(),
 			services.Kafka.ServiceType():         services.Kafka.DataSourceSchema(),
 			services.Memcached.ServiceType():     services.Memcached.DataSourceSchema(),
 			services.MongoDB.ServiceType():       services.MongoDB.DataSourceSchema(),
@@ -333,10 +339,10 @@ func DataSourceService() *schema.Resource {
 	}
 }
 
-func dataSourceServiceRead(_ context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func dataSourceServiceRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	id := d.Get("id").(string)
 	d.SetId(id)
 
 	// FIXME: fix semgrep warning
-	return readService(d, meta) // nosemgrep: data-source-with-resource-read
+	return readService(ctx, d, meta) // nosemgrep: data-source-with-resource-read
 }
