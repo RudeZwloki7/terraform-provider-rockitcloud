@@ -1,6 +1,5 @@
 ---
 subcategory: "PaaS"
-layout: "aws"
 page_title: "aws_paas_clickhouse_quota"
 description: |-
   Manages a quota of a PaaS ClickHouse service.
@@ -9,6 +8,14 @@ description: |-
 # Resource: aws_paas_clickhouse_quota
 
 Manages a quota of a PaaS ClickHouse service.
+
+~> **Note** To assign this quota to a user managed inside the parent `aws_paas_service`,
+follow the [staged apply workflow](paas_service.md#clickhouse-user).
+The quota must already exist when the user is assigned to it.
+
+~> **Note** A quota assigned to a user cannot be deleted.
+Before removing this resource or running `terraform destroy`, change every affected user's `quota`
+to an existing alternative such as `default` and apply that change first.
 
 ## Example Usage
 
@@ -36,7 +43,8 @@ resource "aws_paas_clickhouse_quota" "example" {
 The following arguments are supported:
 
 * `interval` - (Required, Editable) List of intervals with limits. The structure of this block is [described below](#interval).
-* `name` - (Required) The quota name. The value can only contain Latin letters, numbers and underscores (_).
+* `name` - (Required) The quota name. The value must start with a Latin letter and
+  can only contain Latin letters, numbers and underscores (_).
   The value must not be `default`.
 * `service_id` - (Required) The ID of the PaaS ClickHouse service.
 

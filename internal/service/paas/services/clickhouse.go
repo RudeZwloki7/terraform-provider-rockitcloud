@@ -27,12 +27,12 @@ var ClickHouse = clickHouseManager{
 	},
 }
 
-var clickHouseNameRegexp = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+var clickHouseNameRegexp = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 
 // ClickHouseNameValidateFunc validates names of ClickHouse resources: users, databases, profiles and quotas.
 var ClickHouseNameValidateFunc = validation.StringMatch(
 	clickHouseNameRegexp,
-	"name can only contain Latin letters, numbers and underscores (_)",
+	"name must start with a Latin letter and can only contain Latin letters, numbers and underscores (_)",
 )
 
 func (s clickHouseManager) serviceParametersSchema() map[string]*schema.Schema {
@@ -43,9 +43,10 @@ func (s clickHouseManager) serviceParametersSchema() map[string]*schema.Schema {
 			Elem:     &schema.Schema{Type: schema.TypeString},
 		},
 		"version": {
-			Type:     schema.TypeString,
-			Required: true,
-			ForceNew: true,
+			Type:         schema.TypeString,
+			Required:     true,
+			ForceNew:     true,
+			ValidateFunc: validation.StringIsNotEmpty,
 		},
 	}
 }
@@ -66,6 +67,15 @@ func (s clickHouseManager) serviceParametersDataSourceSchema() map[string]*schem
 
 func (s clickHouseManager) userParametersSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
+		"name": {
+			Type:     schema.TypeString,
+			Required: true,
+			ValidateFunc: validation.All(
+				ClickHouseNameValidateFunc,
+				validation.StringLenBetween(1, 63),
+				validation.StringNotInSlice([]string{"default", "cluster_user"}, false),
+			),
+		},
 		"grants": {
 			Type:     schema.TypeList,
 			Optional: true,
@@ -156,8 +166,9 @@ func (s clickHouseManager) userParametersDataSourceSchema() map[string]*schema.S
 			},
 		},
 		"password": {
-			Type:     schema.TypeString,
-			Computed: true,
+			Type:      schema.TypeString,
+			Computed:  true,
+			Sensitive: true,
 		},
 		"password_type": {
 			Type:     schema.TypeString,
@@ -174,6 +185,20 @@ func (s clickHouseManager) userParametersDataSourceSchema() map[string]*schema.S
 	}
 }
 
+func (s clickHouseManager) databaseParametersSchema() map[string]*schema.Schema {
+	return map[string]*schema.Schema{
+		"name": {
+			Type:     schema.TypeString,
+			Required: true,
+			ValidateFunc: validation.All(
+				ClickHouseNameValidateFunc,
+				validation.StringLenBetween(1, 63),
+				validation.StringNotInSlice([]string{"default", "readonly", "system", "information_schema", "INFORMATION_SCHEMA"}, false),
+			),
+		},
+	}
+}
+
 func (s clickHouseManager) expandServiceParameters(tfMap map[string]interface{}) ServiceParameters {
 	if tfMap == nil {
 		return nil
@@ -181,7 +206,7 @@ func (s clickHouseManager) expandServiceParameters(tfMap map[string]interface{})
 
 	serviceParameters := ServiceParameters{}
 
-	if v, ok := tfMap["options"].(map[string]interface{}); ok && len(v) > 0 {
+	if v, ok := tfMap["options"].(map[string]interface{}); ok {
 		serviceParameters["options"] = v
 	}
 

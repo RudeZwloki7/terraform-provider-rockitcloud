@@ -339,10 +339,10 @@ func DataSourceService() *schema.Resource {
 	}
 }
 
-func dataSourceServiceRead(_ context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func dataSourceServiceRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	id := d.Get("id").(string)
 	d.SetId(id)
 
 	// FIXME: fix semgrep warning
-	return readService(d, meta) // nosemgrep: data-source-with-resource-read
+	return readService(ctx, d, meta) // nosemgrep: data-source-with-resource-read
 }

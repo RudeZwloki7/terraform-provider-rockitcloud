@@ -124,9 +124,9 @@ func (s gitLabManager) serviceParametersSchema() map[string]*schema.Schema {
 						ValidateFunc: validation.IntBetween(0, 60),
 					},
 					"uid": {
-						Type:     schema.TypeString,
-						Optional: true,
-						Default:  "sub",
+						Type:         schema.TypeString,
+						Required:     true,
+						ValidateFunc: validation.StringIsNotEmpty,
 					},
 					"user_filter": {
 						Type:     schema.TypeString,
@@ -334,12 +334,14 @@ func (s gitLabManager) serviceParametersDataSourceSchema() map[string]*schema.Sc
 						Computed: true,
 					},
 					"client_cert": {
-						Type:     schema.TypeString,
-						Computed: true,
+						Type:      schema.TypeString,
+						Computed:  true,
+						Sensitive: true,
 					},
 					"client_key": {
-						Type:     schema.TypeString,
-						Computed: true,
+						Type:      schema.TypeString,
+						Computed:  true,
+						Sensitive: true,
 					},
 					"encryption": {
 						Type:     schema.TypeString,
@@ -358,8 +360,9 @@ func (s gitLabManager) serviceParametersDataSourceSchema() map[string]*schema.Sc
 						Computed: true,
 					},
 					"password": {
-						Type:     schema.TypeString,
-						Computed: true,
+						Type:      schema.TypeString,
+						Computed:  true,
+						Sensitive: true,
 					},
 					"port": {
 						Type:     schema.TypeInt,
@@ -407,8 +410,9 @@ func (s gitLabManager) serviceParametersDataSourceSchema() map[string]*schema.Sc
 						Computed: true,
 					},
 					"client_secret": {
-						Type:     schema.TypeString,
-						Computed: true,
+						Type:      schema.TypeString,
+						Computed:  true,
+						Sensitive: true,
 					},
 					"issuer": {
 						Type:     schema.TypeString,
@@ -434,8 +438,9 @@ func (s gitLabManager) serviceParametersDataSourceSchema() map[string]*schema.Sc
 			},
 		},
 		"password": {
-			Type:     schema.TypeString,
-			Computed: true,
+			Type:      schema.TypeString,
+			Computed:  true,
+			Sensitive: true,
 		},
 		"registry": {
 			Type:     schema.TypeList,
@@ -491,8 +496,9 @@ func (s gitLabManager) serviceParametersDataSourceSchema() map[string]*schema.Sc
 						Computed: true,
 					},
 					"password": {
-						Type:     schema.TypeString,
-						Computed: true,
+						Type:      schema.TypeString,
+						Computed:  true,
+						Sensitive: true,
 					},
 					"port": {
 						Type:     schema.TypeInt,
@@ -639,7 +645,11 @@ func expandGitLabLDAPParameters(tfMap map[string]interface{}) ServiceParameters 
 	}
 
 	if v, ok := tfMap["retry_empty_result_with_codes"].([]interface{}); ok && len(v) > 0 {
-		serviceParameters["retry_empty_result_with_codes"] = v
+		codes := make([]interface{}, len(v))
+		for i, code := range v {
+			codes[i] = int64(code.(int))
+		}
+		serviceParameters["retry_empty_result_with_codes"] = codes
 	}
 
 	if v, ok := tfMap["ssl_version"].(string); ok && v != "" {
@@ -840,11 +850,15 @@ func flattenGitLabLDAPParameters(serviceParameters ServiceParameters) map[string
 		tfMap["ciphers"] = v
 	}
 
-	if v, ok := serviceParameters["client_cert"].(string); ok {
+	if v, ok := serviceParameters["clientCert"].(string); ok {
+		tfMap["client_cert"] = v
+	} else if v, ok := serviceParameters["client_cert"].(string); ok {
 		tfMap["client_cert"] = v
 	}
 
-	if v, ok := serviceParameters["client_key"].(string); ok {
+	if v, ok := serviceParameters["clientKey"].(string); ok {
+		tfMap["client_key"] = v
+	} else if v, ok := serviceParameters["client_key"].(string); ok {
 		tfMap["client_key"] = v
 	}
 

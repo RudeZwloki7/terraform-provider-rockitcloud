@@ -133,6 +133,8 @@ resource "aws_paas_service" "elasticsearch" {
 
 ```terraform
 resource "aws_paas_service" "clickhouse" {
+  depends_on = [aws_route.default_route]
+
   name          = "tf-service"
   instance_type = "c5.large"
 
@@ -180,6 +182,8 @@ resource "aws_paas_service" "clickhouse" {
 
 ```terraform
 resource "aws_paas_service" "clickhouse" {
+  depends_on = [aws_route.default_route]
+
   name          = "tf-service"
   instance_type = "c5.large"
 
@@ -216,12 +220,16 @@ resource "aws_paas_service" "clickhouse" {
 
 ### GitLab service
 
+GitLab requires an instance with at least 2 vCPUs and 8 GiB of memory.
+
 ~> **Note** This example uses the VPC, subnet, internet gateway, NAT gateway and default route defined in the [Elasticsearch service example](#elasticsearch-service).
 
 ```terraform
 resource "aws_paas_service" "gitlab" {
+  depends_on = [aws_route.default_route]
+
   name          = "tf-service"
-  instance_type = "c5.xlarge"
+  instance_type = "m5.large"
 
   root_volume {
     type = "gp2"
@@ -247,12 +255,12 @@ resource "aws_paas_service" "gitlab" {
     }
 
     smtp {
-      address        = "smtp.example.com"
+      address        = "smtp.gitlab.invalid"
       port           = 587
-      username       = "gitlab@example.com"
+      username       = "gitlab@gitlab.invalid"
       password       = "********"
       authentication = "login"
-      email_from     = "gitlab@example.com"
+      email_from     = "gitlab@gitlab.invalid"
     }
   }
 }
@@ -897,7 +905,8 @@ and [`aws_paas_clickhouse_shard`](paas_clickhouse_shard.md) resources.
 
 The `database` block has the following structure:
 
-* `name` - (Required) The database name. The value can only contain Latin letters, numbers and underscores (_).
+* `name` - (Required) The database name. The value must start with a Latin letter, contain at most 63 characters,
+  and can only contain Latin letters, numbers and underscores (_).
   The value must not be `default`, `readonly`, `system` and `information_schema`.
 
 ### ClickHouse user
@@ -906,8 +915,9 @@ The `database` block has the following structure:
 
 The `user` block has the following structure:
 
-* `grants` - (Optional) List of privileges granted to the user (e.g. `GRANT SELECT ON db.*`).
-* `name` - (Required) The ClickHouse user name. The value can only contain Latin letters, numbers and underscores (_).
+* `grants` - (Optional) List of `GRANT` statements without grantees (e.g. `GRANT SELECT ON db.*`).
+* `name` - (Required) The ClickHouse user name. The value must start with a Latin letter, contain at most 63 characters,
+  and can only contain Latin letters, numbers and underscores (_).
   The value must not be `default` and `cluster_user`.
 * `networks` - (Optional) Networks from which the user can connect. The structure of this block is [described below](#clickhouse-user-networks).
 * `password` - (Optional) The ClickHouse user password.
@@ -915,14 +925,25 @@ The `user` block has the following structure:
     * _Valid values:_ `double_sha1`
     * _Default value:_ `double_sha1`
 * `profile` - (Optional) The name of the settings profile assigned to the user.
-  It can be a built-in profile (`default`, `readonly`) or a profile created with the `aws_paas_clickhouse_profile` resource.
+  It can be a built-in profile (`default`, `readonly`) or an existing profile created with the `aws_paas_clickhouse_profile` resource.
     * _Default value:_ `default`
 * `quota` - (Optional) The name of the quota assigned to the user.
-  It can be a built-in quota (`default`) or a quota created with the `aws_paas_clickhouse_quota` resource.
+  It can be a built-in quota (`default`) or an existing quota created with the `aws_paas_clickhouse_quota` resource.
     * _Default value:_ `default`
 
-~> **Note** A profile or quota created with a separate resource must exist before it is assigned to the user.
-In this case, assign it to the user after the profile or quota is created.
+~> **Note** An omitted or empty `grants` list selects the backend defaults, which can include broad privileges
+for [ClickHouse XML users](https://github.com/ClickHouse/ClickHouse/blob/25.3/src/Access/UsersConfigAccessStorage.cpp).
+To give a user no table privileges, use an explicit non-empty list such as `grants = ["GRANT USAGE ON *.*"]`.
+`USAGE` is an alias of the [`NONE` privilege](https://clickhouse.com/docs/reference/statements/grant#none).
+
+~> **Note** Custom profile and quota resources depend on their parent service through `service_id`.
+First apply the service with built-in user assignments and create the child resources.
+Then set `profile` and `quota` to their existing names as literal strings and apply again.
+Referencing child resource attributes from the same parent service creates a Terraform dependency cycle.
+
+~> **Note** K2 Cloud rejects deletion of a profile or quota while it is assigned to a user.
+Before removing these child resources or running `terraform destroy`, change all affected user assignments
+to existing alternatives such as `default` and apply that change first.
 
 #### ClickHouse user networks
 
@@ -999,6 +1020,10 @@ cannot recover values that the API does not return.
 
 ## GitLab argument reference
 
+K2 Cloud provides GitLab CE (Community Edition) with a single master node.
+`high_availability` must be `false`. The subnet must have internet access for
+service installation. See the [K2 Cloud GitLab documentation](https://docs.k2.cloud/ru/services/paas/development/index.html).
+
 In addition to the common arguments for all services [described above](#argument-reference),
 the `gitlab` block can contain the following arguments:
 
@@ -1011,7 +1036,7 @@ the `gitlab` block can contain the following arguments:
 * `monitoring` - (Optional, Editable) The monitoring settings for the service. The structure of this block is [described below](#monitoring).
 * `oidc` - (Optional, Editable) The OIDC settings. If the block is specified, OIDC is enabled.
   The structure of this block is [described below](#gitlab-oidc).
-* `password` - (Required) The GitLab root user password.
+* `password` - (Required) The initial GitLab root user password. Changing this argument recreates the service.
   The value must be 8 to 128 characters long and must not contain `'`, `"`, `` ` `` and `\`.
 * `registry` - (Optional, Editable) The Container Registry settings. If the block is specified, Container Registry is enabled.
   The structure of this block is [described below](#gitlab-registry).
@@ -1049,8 +1074,8 @@ The `ldap` block has the following structure:
 * `timeout` - (Optional) The query timeout in seconds.
     * _Valid values:_ From 0 to 60
     * _Default value:_ `10`
-* `uid` - (Optional) The UID attribute.
-    * _Default value:_ `sub`
+* `uid` - (Required) The non-empty LDAP attribute used to identify a user, such as `uid` for OpenLDAP or `sAMAccountName` for Active Directory.
+  Set the attribute used by your directory explicitly; the provider does not infer a default.
 * `user_filter` - (Optional) The user filter.
 * `verify_certificates` - (Optional) Indicates whether SSL certificates are verified.
 
@@ -1084,6 +1109,8 @@ The `registry` block has the following structure:
 * `s3_user` - (Optional) The login of a user with permissions to the bucket in object storage.
   The parameter must be set if `storage` is `s3`.
 * `storage` - (Optional) The storage type. The value cannot be changed while Container Registry is enabled.
+  To change the storage type, first remove the `registry` block and apply the configuration, then add the block with the new storage type and apply again.
+  Changing the storage type does not copy existing images. Migrate Registry data separately as described in the [GitLab documentation](https://docs.gitlab.com/administration/packages/container_registry/#migrate-to-object-storage-without-downtime).
     * _Valid values:_ `filesystem`, `s3`
     * _Default value:_ `filesystem`
 * `url` - (Optional) The object storage endpoint URL.
@@ -1096,7 +1123,7 @@ The `registry` block has the following structure:
 The `smtp` block has the following structure:
 
 * `address` - (Required) The SMTP server address.
-* `authentication` - (Required) The SMTP authentication method.
+* `authentication` - (Required) The SMTP authentication method. Required by the K2 Cloud API even when credentials are omitted.
     * _Valid values:_ `plain`, `login`
 * `domain` - (Optional) The SMTP domain.
 * `email_from` - (Optional) The email sender address.

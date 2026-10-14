@@ -1,15 +1,17 @@
 package paas
 
 import (
+	"context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/paas"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-provider-aws/internal/tfresource"
 )
 
-func statusService(conn *paas.PaaS, id string) resource.StateRefreshFunc {
+func statusService(ctx context.Context, conn *paas.PaaS, id string) resource.StateRefreshFunc {
 	return func() (interface{}, string, error) {
-		output, err := FindServiceByID(conn, id)
+		output, err := findServiceByID(ctx, conn, id)
 
 		if tfresource.NotFound(err) {
 			return nil, "", nil

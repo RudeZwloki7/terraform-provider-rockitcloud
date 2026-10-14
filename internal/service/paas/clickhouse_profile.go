@@ -73,14 +73,18 @@ func resourceClickHouseProfileCreate(ctx context.Context, d *schema.ResourceData
 
 	log.Printf("[DEBUG] Creating PaaS ClickHouse Profile: %s", input)
 	outputRaw, err := tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutCreate), func() (interface{}, error) {
-		return conn.CreateClickhouseProfile(input)
+		return conn.CreateClickhouseProfileWithContext(ctx, input)
 	}, OperationNotAllowedCode)
 
 	if err != nil {
 		return diag.Errorf("error creating PaaS ClickHouse Profile (%s) in Service (%s): %s", name, serviceID, err)
 	}
 
-	id := aws.StringValue(outputRaw.(*paas.CreateClickhouseProfileOutput).Profile.Id)
+	output := outputRaw.(*paas.CreateClickhouseProfileOutput)
+	if output == nil || output.Profile == nil || aws.StringValue(output.Profile.Id) == "" {
+		return diag.Errorf("error creating PaaS ClickHouse Profile (%s) in Service (%s): API returned no profile ID", name, serviceID)
+	}
+	id := aws.StringValue(output.Profile.Id)
 	d.SetId(ClickHouseProfileCreateResourceID(serviceID, id))
 
 	_, err = waitServiceUpdated(ctx, conn, serviceID, d.Timeout(schema.TimeoutCreate))
@@ -101,7 +105,7 @@ func resourceClickHouseProfileRead(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(err)
 	}
 
-	profile, err := FindClickHouseProfileByID(conn, serviceID, id)
+	profile, err := findClickHouseProfileByID(ctx, conn, serviceID, id)
 
 	if !d.IsNewResource() && tfresource.NotFound(err) {
 		log.Printf("[WARN] PaaS ClickHouse Profile (%s) not found, removing from state", d.Id())
@@ -116,8 +120,12 @@ func resourceClickHouseProfileRead(ctx context.Context, d *schema.ResourceData, 
 	d.Set("name", profile.Name)
 	d.Set("service_id", serviceID)
 
+	var settings map[string]interface{}
 	if profile.Parameters != nil {
-		d.Set("settings", flattenClickHouseProfileSettings(profile.Parameters.Settings))
+		settings = profile.Parameters.Settings
+	}
+	if err := d.Set("settings", flattenClickHouseProfileSettings(settings)); err != nil {
+		return diag.Errorf("error setting PaaS ClickHouse Profile (%s) settings: %s", d.Id(), err)
 	}
 
 	return nil
@@ -143,7 +151,7 @@ func resourceClickHouseProfileUpdate(ctx context.Context, d *schema.ResourceData
 
 		log.Printf("[DEBUG] Modifying PaaS ClickHouse Profile: %s", input)
 		_, err := tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutUpdate), func() (interface{}, error) {
-			return conn.ModifyClickhouseProfile(input)
+			return conn.ModifyClickhouseProfileWithContext(ctx, input)
 		}, OperationNotAllowedCode)
 
 		if err != nil {
@@ -176,7 +184,7 @@ func resourceClickHouseProfileDelete(ctx context.Context, d *schema.ResourceData
 
 	log.Printf("[DEBUG] Deleting PaaS ClickHouse Profile: %s", input)
 	_, err = tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutDelete), func() (interface{}, error) {
-		return conn.DeleteClickhouseProfile(input)
+		return conn.DeleteClickhouseProfileWithContext(ctx, input)
 	}, OperationNotAllowedCode)
 
 	if tfawserr.ErrCodeEquals(err, ServiceNotFoundCode, ResourceDoesNotExistCode) {

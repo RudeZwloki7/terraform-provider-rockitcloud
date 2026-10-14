@@ -25,6 +25,7 @@ func ResourceClickHouseQuota() *schema.Resource {
 		ReadContext:   resourceClickHouseQuotaRead,
 		UpdateContext: resourceClickHouseQuotaUpdate,
 		DeleteContext: resourceClickHouseQuotaDelete,
+		CustomizeDiff: validateClickHouseQuotaIntervals,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -123,7 +124,55 @@ func ResourceClickHouseQuota() *schema.Resource {
 	}
 }
 
+func validateClickHouseQuotaIntervals(_ context.Context, d *schema.ResourceDiff, _ interface{}) error {
+	// A reference may leave a limit unknown until apply. Validate it once Terraform
+	// can resolve the complete interval rather than rejecting a valid dependency.
+	if !d.NewValueKnown("interval") {
+		return nil
+	}
+
+	return validateClickHouseQuotaIntervalLimits(d.Get("interval").([]interface{}), func(index int, key string) bool {
+		return d.NewValueKnown(fmt.Sprintf("interval.%d.%s", index, key))
+	})
+}
+
+func validateClickHouseQuotaIntervalLimits(intervals []interface{}, isLimitKnown func(int, string) bool) error {
+	for index, raw := range intervals {
+		interval, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		hasLimit := false
+		for _, key := range []string{
+			"errors", "execution_time", "failed_sequential_authentications", "queries",
+			"query_inserts", "query_selects", "read_bytes", "read_rows", "result_bytes",
+			"result_rows", "written_bytes",
+		} {
+			if isLimitKnown != nil && !isLimitKnown(index, key) {
+				// An unknown value may provide the required limit during apply.
+				hasLimit = true
+				continue
+			}
+			switch value := interval[key].(type) {
+			case int:
+				hasLimit = hasLimit || value > 0
+			case float64:
+				hasLimit = hasLimit || value > 0
+			}
+		}
+		if !hasLimit {
+			return fmt.Errorf("interval.%d must specify at least one quota limit in addition to duration", index)
+		}
+	}
+
+	return nil
+}
+
 func resourceClickHouseQuotaCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	if err := validateClickHouseQuotaIntervalLimits(d.Get("interval").([]interface{}), nil); err != nil {
+		return diag.FromErr(err)
+	}
+
 	conn := meta.(*conns.AWSClient).PaaSConn
 	serviceID := d.Get("service_id").(string)
 	name := d.Get("name").(string)
@@ -138,14 +187,18 @@ func resourceClickHouseQuotaCreate(ctx context.Context, d *schema.ResourceData, 
 
 	log.Printf("[DEBUG] Creating PaaS ClickHouse Quota: %s", input)
 	outputRaw, err := tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutCreate), func() (interface{}, error) {
-		return conn.CreateClickhouseQuota(input)
+		return conn.CreateClickhouseQuotaWithContext(ctx, input)
 	}, OperationNotAllowedCode)
 
 	if err != nil {
 		return diag.Errorf("error creating PaaS ClickHouse Quota (%s) in Service (%s): %s", name, serviceID, err)
 	}
 
-	id := aws.StringValue(outputRaw.(*paas.CreateClickhouseQuotaOutput).Quota.Id)
+	output := outputRaw.(*paas.CreateClickhouseQuotaOutput)
+	if output == nil || output.Quota == nil || aws.StringValue(output.Quota.Id) == "" {
+		return diag.Errorf("error creating PaaS ClickHouse Quota (%s) in Service (%s): API returned no quota ID", name, serviceID)
+	}
+	id := aws.StringValue(output.Quota.Id)
 	d.SetId(ClickHouseQuotaCreateResourceID(serviceID, id))
 
 	_, err = waitServiceUpdated(ctx, conn, serviceID, d.Timeout(schema.TimeoutCreate))
@@ -166,7 +219,7 @@ func resourceClickHouseQuotaRead(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
-	quota, err := FindClickHouseQuotaByID(conn, serviceID, id)
+	quota, err := findClickHouseQuotaByID(ctx, conn, serviceID, id)
 
 	if !d.IsNewResource() && tfresource.NotFound(err) {
 		log.Printf("[WARN] PaaS ClickHouse Quota (%s) not found, removing from state", d.Id())
@@ -178,8 +231,9 @@ func resourceClickHouseQuotaRead(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("error reading PaaS ClickHouse Quota (%s): %s", d.Id(), err)
 	}
 
-	if v, ok := quota.Parameters["interval"].([]interface{}); ok {
-		d.Set("interval", flattenClickHouseQuotaIntervals(v))
+	intervals, _ := quota.Parameters["interval"].([]interface{})
+	if err := d.Set("interval", flattenClickHouseQuotaIntervals(intervals)); err != nil {
+		return diag.Errorf("error setting PaaS ClickHouse Quota (%s) intervals: %s", d.Id(), err)
 	}
 
 	d.Set("name", quota.Name)
@@ -198,6 +252,10 @@ func resourceClickHouseQuotaUpdate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	if d.HasChange("interval") {
+		if err := validateClickHouseQuotaIntervalLimits(d.Get("interval").([]interface{}), nil); err != nil {
+			return diag.FromErr(err)
+		}
+
 		input := &paas.ModifyClickhouseQuotaInput{
 			Parameters: map[string]interface{}{
 				"interval": expandClickHouseQuotaIntervals(d.Get("interval").([]interface{})),
@@ -208,7 +266,7 @@ func resourceClickHouseQuotaUpdate(ctx context.Context, d *schema.ResourceData, 
 
 		log.Printf("[DEBUG] Modifying PaaS ClickHouse Quota: %s", input)
 		_, err := tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutUpdate), func() (interface{}, error) {
-			return conn.ModifyClickhouseQuota(input)
+			return conn.ModifyClickhouseQuotaWithContext(ctx, input)
 		}, OperationNotAllowedCode)
 
 		if err != nil {
@@ -241,7 +299,7 @@ func resourceClickHouseQuotaDelete(ctx context.Context, d *schema.ResourceData, 
 
 	log.Printf("[DEBUG] Deleting PaaS ClickHouse Quota: %s", input)
 	_, err = tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutDelete), func() (interface{}, error) {
-		return conn.DeleteClickhouseQuota(input)
+		return conn.DeleteClickhouseQuotaWithContext(ctx, input)
 	}, OperationNotAllowedCode)
 
 	if tfawserr.ErrCodeEquals(err, ServiceNotFoundCode, ResourceDoesNotExistCode) {

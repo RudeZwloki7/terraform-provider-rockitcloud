@@ -18,6 +18,14 @@ type clickHouseServiceConfig struct {
 // - cluster of combined nodes (high_availability = true): additional_roles = ["coordinator"];
 // - cluster with dedicated keepers (high_availability = true): coordinator block.
 func validateClickHouseServiceConfiguration(d *schema.ResourceDiff) error {
+	// Unknown topology values are resolved during apply. GetOk otherwise exposes
+	// them as zero values and can reject a valid dependency during planning.
+	for _, key := range []string{"high_availability", "additional_roles", "coordinator"} {
+		if !d.NewValueKnown(key) {
+			return nil
+		}
+	}
+
 	config := clickHouseServiceConfig{}
 
 	if v, ok := d.GetOk("high_availability"); ok {
@@ -31,7 +39,10 @@ func validateClickHouseServiceConfiguration(d *schema.ResourceDiff) error {
 	}
 
 	if v, ok := d.GetOk("additional_roles"); ok {
-		for _, r := range v.([]interface{}) {
+		for index, r := range v.([]interface{}) {
+			if !d.NewValueKnown(fmt.Sprintf("additional_roles.%d", index)) {
+				return nil
+			}
 			if s, ok := r.(string); ok && s == "coordinator" {
 				config.hasCoordinatorRole = true
 				break

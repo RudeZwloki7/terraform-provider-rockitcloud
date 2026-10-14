@@ -1,6 +1,5 @@
 ---
 subcategory: "PaaS"
-layout: "aws"
 page_title: "aws_paas_clickhouse_shard"
 description: |-
   Manages a shard of a PaaS ClickHouse service.
@@ -15,6 +14,9 @@ it will only be removed from the Terraform state.
 
 ~> **Note** A standalone service supports only one shard with one replica.
 The total number of replicas of all shards must not exceed the number of server instances of the service.
+
+~> **Note** Increasing the replica count of an earlier shard can reassign nodes of later shards.
+Data is not automatically migrated between shards. Plan any required data migration separately.
 
 ## Example Usage
 

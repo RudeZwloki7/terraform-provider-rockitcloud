@@ -17,12 +17,16 @@ import (
 )
 
 func FindServiceByID(conn *paas.PaaS, id string) (*paas.Service, error) {
+	return findServiceByID(context.Background(), conn, id)
+}
+
+func findServiceByID(ctx context.Context, conn *paas.PaaS, id string) (*paas.Service, error) {
 	input := &paas.DescribeServiceInput{
 		ServiceId: aws.String(id),
 	}
 
 	output, err := conn.DescribeServiceWithContext(
-		context.Background(),
+		ctx,
 		input,
 		request.WithLogLevel(aws.LogOff),
 	)
@@ -46,11 +50,15 @@ func FindServiceByID(conn *paas.PaaS, id string) (*paas.Service, error) {
 }
 
 func FindClickHouseProfileByID(conn *paas.PaaS, serviceID, id string) (*paas.ClickHouseProfile, error) {
+	return findClickHouseProfileByID(context.Background(), conn, serviceID, id)
+}
+
+func findClickHouseProfileByID(ctx context.Context, conn *paas.PaaS, serviceID, id string) (*paas.ClickHouseProfile, error) {
 	input := &paas.ListClickhouseProfilesInput{
 		ServiceId: aws.String(serviceID),
 	}
 
-	output, err := conn.ListClickhouseProfiles(input)
+	output, err := conn.ListClickhouseProfilesWithContext(ctx, input)
 
 	if tfawserr.ErrCodeEquals(err, ServiceNotFoundCode) {
 		return nil, &resource.NotFoundError{
@@ -68,7 +76,7 @@ func FindClickHouseProfileByID(conn *paas.PaaS, serviceID, id string) (*paas.Cli
 	}
 
 	for _, profile := range output.Profiles {
-		if aws.StringValue(profile.Id) == id {
+		if profile != nil && aws.StringValue(profile.Id) == id {
 			return profile, nil
 		}
 	}
@@ -79,11 +87,15 @@ func FindClickHouseProfileByID(conn *paas.PaaS, serviceID, id string) (*paas.Cli
 }
 
 func FindClickHouseQuotaByID(conn *paas.PaaS, serviceID, id string) (*paas.ClickHouseQuota, error) {
+	return findClickHouseQuotaByID(context.Background(), conn, serviceID, id)
+}
+
+func findClickHouseQuotaByID(ctx context.Context, conn *paas.PaaS, serviceID, id string) (*paas.ClickHouseQuota, error) {
 	input := &paas.ListClickhouseQuotasInput{
 		ServiceId: aws.String(serviceID),
 	}
 
-	output, err := conn.ListClickhouseQuotas(input)
+	output, err := conn.ListClickhouseQuotasWithContext(ctx, input)
 
 	if tfawserr.ErrCodeEquals(err, ServiceNotFoundCode) {
 		return nil, &resource.NotFoundError{
@@ -101,7 +113,7 @@ func FindClickHouseQuotaByID(conn *paas.PaaS, serviceID, id string) (*paas.Click
 	}
 
 	for _, quota := range output.Quotas {
-		if aws.StringValue(quota.Id) == id {
+		if quota != nil && aws.StringValue(quota.Id) == id {
 			return quota, nil
 		}
 	}
@@ -112,11 +124,15 @@ func FindClickHouseQuotaByID(conn *paas.PaaS, serviceID, id string) (*paas.Click
 }
 
 func FindClickHouseShardByIndex(conn *paas.PaaS, serviceID string, index int64) (*paas.ClickHouseShard, error) {
+	return findClickHouseShardByIndex(context.Background(), conn, serviceID, index)
+}
+
+func findClickHouseShardByIndex(ctx context.Context, conn *paas.PaaS, serviceID string, index int64) (*paas.ClickHouseShard, error) {
 	input := &paas.ListClickhouseShardsInput{
 		ServiceId: aws.String(serviceID),
 	}
 
-	output, err := conn.ListClickhouseShards(input)
+	output, err := conn.ListClickhouseShardsWithContext(ctx, input)
 
 	if tfawserr.ErrCodeEquals(err, ServiceNotFoundCode) {
 		return nil, &resource.NotFoundError{
@@ -134,7 +150,7 @@ func FindClickHouseShardByIndex(conn *paas.PaaS, serviceID string, index int64) 
 	}
 
 	for _, shard := range output.Shards {
-		if aws.Int64Value(shard.Index) == index {
+		if shard != nil && shard.Index != nil && aws.Int64Value(shard.Index) == index {
 			return shard, nil
 		}
 	}

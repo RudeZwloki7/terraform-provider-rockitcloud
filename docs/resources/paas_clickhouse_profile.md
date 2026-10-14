@@ -1,6 +1,5 @@
 ---
 subcategory: "PaaS"
-layout: "aws"
 page_title: "aws_paas_clickhouse_profile"
 description: |-
   Manages a settings profile of a PaaS ClickHouse service.
@@ -9,6 +8,14 @@ description: |-
 # Resource: aws_paas_clickhouse_profile
 
 Manages a settings profile of a PaaS ClickHouse service.
+
+~> **Note** To assign this profile to a user managed inside the parent `aws_paas_service`,
+follow the [staged apply workflow](paas_service.md#clickhouse-user).
+The profile must already exist when the user is assigned to it.
+
+~> **Note** A profile assigned to a user cannot be deleted.
+Before removing this resource or running `terraform destroy`, change every affected user's `profile`
+to an existing alternative such as `default` and apply that change first.
 
 ## Example Usage
 
@@ -28,7 +35,8 @@ resource "aws_paas_clickhouse_profile" "example" {
 
 The following arguments are supported:
 
-* `name` - (Required) The profile name. The value can only contain Latin letters, numbers and underscores (_).
+* `name` - (Required) The profile name. The value must start with a Latin letter and
+  can only contain Latin letters, numbers and underscores (_).
   The value must not be `default` and `readonly`.
 * `service_id` - (Required) The ID of the PaaS ClickHouse service.
 * `settings` - (Optional, Editable) Map containing ClickHouse settings of the profile. Values are strings.

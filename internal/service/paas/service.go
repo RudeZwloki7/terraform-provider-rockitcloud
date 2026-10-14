@@ -525,25 +525,18 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 		input.UserDataContentType = aws.String(d.Get("user_data_content_type").(string))
 	}
 
-	if manager.ServiceType() == services.ServiceTypeELK {
-		log.Printf("[DEBUG] Creating PaaS ELK Service %q", name)
-	} else {
-		log.Printf("[DEBUG] Creating PaaS Service: %s", input)
-	}
-	var output *paas.CreateServiceOutput
-	var err error
-	if manager.ServiceType() == services.ServiceTypeELK {
-		output, err = conn.CreateServiceWithContext(
-			ctx,
-			input,
-			request.WithLogLevel(aws.LogOff),
-		)
-	} else {
-		output, err = conn.CreateService(input)
-	}
+	log.Printf("[DEBUG] Creating PaaS %s Service %q", manager.ServiceType(), name)
+	output, err := conn.CreateServiceWithContext(
+		ctx,
+		input,
+		request.WithLogLevel(aws.LogOff),
+	)
 
 	if err != nil {
 		return diag.Errorf("error creating PaaS Service with name %s: %s", name, err)
+	}
+	if output == nil || output.Service == nil || aws.StringValue(output.Service.Id) == "" {
+		return diag.Errorf("error creating PaaS Service with name %s: missing service ID in response", name)
 	}
 
 	id := aws.StringValue(output.Service.Id)
@@ -561,8 +554,10 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 	return resourceServiceUpdate(ctx, d, meta)
 }
 
-func resourceServiceRead(_ context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	diags := readService(d, meta)
+func resourceServiceRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	previousGitLabParameters, _ := d.GetOk(services.ServiceTypeGitLab)
+
+	diags := readService(ctx, d, meta)
 	if diags.HasError() || d.Id() == "" {
 		return diags
 	}
@@ -576,15 +571,22 @@ func resourceServiceRead(_ context.Context, d *schema.ResourceData, meta interfa
 	if err := setUnsupportedArbitratorRequired(d, manager); err != nil {
 		return diag.Errorf("error setting arbitrator_required: %s", err)
 	}
+	if serviceType == services.ServiceTypeGitLab {
+		parameters := d.Get(serviceType).([]interface{})
+		preserveGitLabInputOnlyParameters(parameters, previousGitLabParameters)
+		if err := d.Set(serviceType, parameters); err != nil {
+			return diag.Errorf("error preserving GitLab input-only parameters: %s", err)
+		}
+	}
 
 	return diags
 }
 
-func readService(d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func readService(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	conn := meta.(*conns.AWSClient).PaaSConn
 	id := d.Id()
 
-	service, err := FindServiceByID(conn, id)
+	service, err := findServiceByID(ctx, conn, id)
 
 	if !d.IsNewResource() && tfresource.NotFound(err) {
 		log.Printf("[WARN] PaaS Service (%s) not found, removing from state", id)
@@ -719,6 +721,18 @@ func preserveELKInputOnlyParameters(d *schema.ResourceData, parametersMap map[st
 }
 
 func serviceParametersForUpdate(serviceType string, input services.ServiceParameters) services.ServiceParameters {
+	if serviceType == services.ServiceTypeGitLab {
+		// GitLab's root password is an initial credential, not an editable
+		// service setting. Keep it on CreateService only, including when a
+		// deferred integration update immediately follows creation.
+		output := services.ServiceParameters{}
+		for key, value := range input {
+			if key != "password" {
+				output[key] = value
+			}
+		}
+		return output
+	}
 	if serviceType != services.ServiceTypeELK {
 		return input
 	}
@@ -731,6 +745,47 @@ func serviceParametersForUpdate(serviceType string, input services.ServiceParame
 	}
 
 	return output
+}
+
+func preserveGitLabInputOnlyParameters(parameters []interface{}, previous interface{}) {
+	previousParameters, ok := previous.([]interface{})
+	if !ok || len(previousParameters) == 0 || len(parameters) == 0 {
+		return
+	}
+	current, currentOK := parameters[0].(map[string]interface{})
+	old, oldOK := previousParameters[0].(map[string]interface{})
+	if !currentOK || !oldOK {
+		return
+	}
+	preserve := func(current, old map[string]interface{}, names []string) {
+		for _, name := range names {
+			if value, ok := current[name].(string); ok && value != "" {
+				continue
+			}
+			if value, ok := old[name].(string); ok && value != "" {
+				current[name] = value
+			}
+		}
+	}
+	preserve(current, old, []string{"password"})
+	for block, names := range map[string][]string{
+		"ldap": {"password", "client_cert", "client_key"},
+		"oidc": {"client_secret"},
+		"smtp": {"password"},
+	} {
+		currentBlocks, _ := current[block].([]interface{})
+		oldBlocks, _ := old[block].([]interface{})
+		// A missing remote or configured block must stay disabled. Preserve
+		// only secrets of an integration that is present in both states.
+		if len(currentBlocks) == 0 || len(oldBlocks) == 0 {
+			continue
+		}
+		currentBlock, currentOK := currentBlocks[0].(map[string]interface{})
+		oldBlock, oldOK := oldBlocks[0].(map[string]interface{})
+		if currentOK && oldOK {
+			preserve(currentBlock, oldBlock, names)
+		}
+	}
 }
 
 func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -759,7 +814,7 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 
 		log.Printf("[DEBUG] Modifying PaaS Service data volume size: %+v", input)
-		_, err := conn.ModifyInstanceVolumeSize(input)
+		_, err := conn.ModifyInstanceVolumeSizeWithContext(ctx, input)
 
 		if err != nil {
 			return diag.Errorf("error modifying PaaS Service (%s) data volume size: %s", id, err)
@@ -783,7 +838,7 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 
 		log.Printf("[DEBUG] Modifying PaaS Service data volume IOPS: %+v", input)
-		_, err := conn.ModifyInstanceVolumeIops(input)
+		_, err := conn.ModifyInstanceVolumeIopsWithContext(ctx, input)
 
 		if err != nil {
 			return diag.Errorf("error modifying PaaS Service (%s) data volume IOPS: %s", id, err)
@@ -811,7 +866,7 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			}
 
 			log.Printf("[DEBUG] Modifying PaaS Service instance type: %+v", input)
-			_, err := conn.ModifyInstanceType(input)
+			_, err := conn.ModifyInstanceTypeWithContext(ctx, input)
 
 			if err != nil {
 				return diag.Errorf("error modifying PaaS Service (%s) instance type for node role %s: %s", id, nodeRole, err)
@@ -837,21 +892,12 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			manager.ExpandServiceParameters(parametersMap),
 		)
 
-		if serviceType == services.ServiceTypeELK {
-			log.Printf("[DEBUG] Modifying PaaS ELK Service (%s) parameters", id)
-		} else {
-			log.Printf("[DEBUG] Modifying PaaS Service parameters: %s", input)
-		}
-		var err error
-		if serviceType == services.ServiceTypeELK {
-			_, err = conn.ModifyServiceParametersWithContext(
-				ctx,
-				input,
-				request.WithLogLevel(aws.LogOff),
-			)
-		} else {
-			_, err = conn.ModifyServiceParameters(input)
-		}
+		log.Printf("[DEBUG] Modifying PaaS %s Service (%s) parameters", serviceType, id)
+		_, err := conn.ModifyServiceParametersWithContext(
+			ctx,
+			input,
+			request.WithLogLevel(aws.LogOff),
+		)
 
 		if err != nil {
 			return diag.Errorf("error modifying PaaS Service (%s) parameters: %s", id, err)
@@ -895,8 +941,12 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			}
 		}
 
-		log.Printf("[DEBUG] Modifying PaaS Service: %s", input)
-		_, err := conn.ModifyService(input)
+		log.Printf("[DEBUG] Modifying PaaS %s Service (%s) users, databases and backup settings", serviceType, id)
+		_, err := conn.ModifyServiceWithContext(
+			ctx,
+			input,
+			request.WithLogLevel(aws.LogOff),
+		)
 
 		if err != nil {
 			return diag.Errorf("error modifying PaaS Service (%s): %s", id, err)
@@ -923,7 +973,7 @@ func resourceServiceDelete(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	log.Printf("[DEBUG] Deleting PaaS Service: %s", input)
-	_, err := conn.DeleteService(input)
+	_, err := conn.DeleteServiceWithContext(ctx, input)
 
 	if tfawserr.ErrCodeEquals(err, ServiceNotFoundCode) {
 		log.Printf("[WARN] PaaS Service (%s) not found, removing from state", id)
@@ -963,11 +1013,10 @@ func serviceInstanceTypeNodeRolesFromState(d *schema.ResourceData) ([]string, bo
 		return nil, false
 	}
 
-	roles := []string{v.(string)}
-	if v2, ok := d.GetOk("nodes.0.coordinator.0.role"); ok {
-		roles = append(roles, v2.(string))
-	}
-	return roles, true
+	// A dedicated coordinator has its own instance_type configuration. Changing
+	// the common instance_type must resize only the main nodes; a combined role
+	// is kept intact so combined server/coordinator nodes are resized together.
+	return []string{v.(string)}, true
 }
 
 func serviceManager(d *schema.ResourceData) services.ServiceManager {

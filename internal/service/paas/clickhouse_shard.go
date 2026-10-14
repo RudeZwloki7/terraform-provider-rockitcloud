@@ -23,6 +23,7 @@ func ResourceClickHouseShard() *schema.Resource {
 		ReadContext:   resourceClickHouseShardRead,
 		UpdateContext: resourceClickHouseShardUpdate,
 		DeleteContext: resourceClickHouseShardDelete,
+		CustomizeDiff: validateClickHouseShardReplicas,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -63,6 +64,15 @@ func ResourceClickHouseShard() *schema.Resource {
 	}
 }
 
+func validateClickHouseShardReplicas(_ context.Context, d *schema.ResourceDiff, _ interface{}) error {
+	if d.Id() == "" || !d.NewValueKnown("replicas") {
+		return nil
+	}
+
+	oldValue, newValue := d.GetChange("replicas")
+	return validateIncreaseOnly("replicas", oldValue.(int), newValue.(int))
+}
+
 func resourceClickHouseShardCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	conn := meta.(*conns.AWSClient).PaaSConn
 	serviceID := d.Get("service_id").(string)
@@ -74,14 +84,18 @@ func resourceClickHouseShardCreate(ctx context.Context, d *schema.ResourceData, 
 
 	log.Printf("[DEBUG] Adding PaaS ClickHouse Shard: %s", input)
 	outputRaw, err := tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutCreate), func() (interface{}, error) {
-		return conn.AddClickhouseShard(input)
+		return conn.AddClickhouseShardWithContext(ctx, input)
 	}, OperationNotAllowedCode)
 
 	if err != nil {
 		return diag.Errorf("error adding PaaS ClickHouse Shard to Service (%s): %s", serviceID, err)
 	}
 
-	index := aws.Int64Value(outputRaw.(*paas.AddClickhouseShardOutput).Shard.Index)
+	output := outputRaw.(*paas.AddClickhouseShardOutput)
+	if output == nil || output.Shard == nil || output.Shard.Index == nil {
+		return diag.Errorf("error adding PaaS ClickHouse Shard to Service (%s): API returned no shard index", serviceID)
+	}
+	index := aws.Int64Value(output.Shard.Index)
 	d.SetId(ClickHouseShardCreateResourceID(serviceID, index))
 
 	_, err = waitServiceUpdated(ctx, conn, serviceID, d.Timeout(schema.TimeoutCreate))
@@ -102,7 +116,7 @@ func resourceClickHouseShardRead(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
-	shard, err := FindClickHouseShardByIndex(conn, serviceID, index)
+	shard, err := findClickHouseShardByIndex(ctx, conn, serviceID, index)
 
 	if !d.IsNewResource() && tfresource.NotFound(err) {
 		log.Printf("[WARN] PaaS ClickHouse Shard (%s) not found, removing from state", d.Id())
@@ -113,14 +127,15 @@ func resourceClickHouseShardRead(ctx context.Context, d *schema.ResourceData, me
 	if err != nil {
 		return diag.Errorf("error reading PaaS ClickHouse Shard (%s): %s", d.Id(), err)
 	}
+	if shard.Parameters == nil {
+		return diag.Errorf("error reading PaaS ClickHouse Shard (%s): API returned no shard parameters", d.Id())
+	}
 
 	d.Set("index", shard.Index)
 
-	if v := shard.Parameters; v != nil {
-		d.Set("internal_replication", v.InternalReplication)
-		d.Set("replicas", v.Replicas)
-		d.Set("weight", v.Weight)
-	}
+	d.Set("internal_replication", shard.Parameters.InternalReplication)
+	d.Set("replicas", shard.Parameters.Replicas)
+	d.Set("weight", shard.Parameters.Weight)
 
 	d.Set("service_id", serviceID)
 
@@ -137,6 +152,11 @@ func resourceClickHouseShardUpdate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	if d.HasChanges("internal_replication", "replicas", "weight") {
+		oldReplicas, newReplicas := d.GetChange("replicas")
+		if err := validateIncreaseOnly("replicas", oldReplicas.(int), newReplicas.(int)); err != nil {
+			return diag.FromErr(err)
+		}
+
 		input := &paas.ModifyClickhouseShardInput{
 			Parameters: expandClickHouseShardParameters(d),
 			ServiceId:  aws.String(serviceID),
@@ -145,7 +165,7 @@ func resourceClickHouseShardUpdate(ctx context.Context, d *schema.ResourceData, 
 
 		log.Printf("[DEBUG] Modifying PaaS ClickHouse Shard: %s", input)
 		_, err := tfresource.RetryWhenAWSErrCodeEqualsContext(ctx, d.Timeout(schema.TimeoutUpdate), func() (interface{}, error) {
-			return conn.ModifyClickhouseShard(input)
+			return conn.ModifyClickhouseShardWithContext(ctx, input)
 		}, OperationNotAllowedCode)
 
 		if err != nil {

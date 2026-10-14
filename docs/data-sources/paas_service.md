@@ -161,7 +161,7 @@ The `database` block has the following structure:
 
 The `user` block has the following structure:
 
-* `grants` - List of privileges granted to the user.
+* `grants` - Configured `GRANT` statements for the user.
 * `id` - The ID of the user.
 * `name` - The ClickHouse user name.
 * `networks` - Networks from which the user can connect. The structure of this block is [described below](#clickhouse-user-networks).
@@ -169,6 +169,9 @@ The `user` block has the following structure:
 * `password_type` - The password encoding.
 * `profile` - The name of the settings profile assigned to the user.
 * `quota` - The name of the quota assigned to the user.
+
+~> **Note** An empty `grants` value represents the backend defaults, which can include broad privileges.
+See the [resource's grants configuration](../resources/paas_service.md#clickhouse-user) for explicit privilege restrictions.
 
 #### ClickHouse user networks
 

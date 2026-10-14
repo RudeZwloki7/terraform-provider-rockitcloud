@@ -16,7 +16,7 @@ func waitServiceCreated(ctx context.Context, conn *paas.PaaS, id string, timeout
 	stateConf := &resource.StateChangeConf{
 		Pending: []string{ServiceStatusPending, ServiceStatusClaimed, ServiceStatusCreating, ServiceStatusProvisioning},
 		Target:  []string{ServiceStatusReady},
-		Refresh: statusService(conn, id),
+		Refresh: statusService(ctx, conn, id),
 		Timeout: timeout,
 	}
 
@@ -37,7 +37,7 @@ func waitServiceUpdated(ctx context.Context, conn *paas.PaaS, id string, timeout
 	stateConf := &resource.StateChangeConf{
 		Pending: []string{ServiceStatusClaimed, ServiceStatusUpdating, ServiceStatusRecovering},
 		Target:  []string{ServiceStatusReady},
-		Refresh: statusService(conn, id),
+		Refresh: statusService(ctx, conn, id),
 		Timeout: timeout,
 	}
 
@@ -72,7 +72,7 @@ func waitServiceReady(ctx context.Context, conn *paas.PaaS, id string, timeout t
 			ServiceStatusRecovering,
 		},
 		Target:  []string{ServiceStatusReady},
-		Refresh: statusService(conn, id),
+		Refresh: statusService(ctx, conn, id),
 		Timeout: timeout,
 	}
 
@@ -306,7 +306,7 @@ func waitServiceDeleted(ctx context.Context, conn *paas.PaaS, id string, timeout
 	stateConf := &resource.StateChangeConf{
 		Pending:        []string{ServiceStatusPending, ServiceStatusClaimed, ServiceStatusDeleting},
 		Target:         []string{ServiceStatusDeleted},
-		Refresh:        statusService(conn, id),
+		Refresh:        statusService(ctx, conn, id),
 		Timeout:        timeout,
 		NotFoundChecks: 1,
 	}

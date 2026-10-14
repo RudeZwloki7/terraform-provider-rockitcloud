@@ -1,0 +1,31 @@
+```release-note:new-resource
+aws_paas_clickhouse_profile
+```
+
+```release-note:new-resource
+aws_paas_clickhouse_quota
+```
+
+```release-note:new-resource
+aws_paas_clickhouse_shard
+```
+
+```release-note:enhancement
+resource/aws_paas_service, data-source/aws_paas_service: Add support for ClickHouse and GitLab services, requiring an explicit LDAP UID attribute for GitLab
+```
+
+```release-note:enhancement
+resource/aws_paas_service, data-source/aws_paas_service: Add support for ClickHouse coordinator roles and the total service instance count
+```
+
+```release-note:enhancement
+data-source/aws_paas_backup, data-source/aws_paas_backups: Add ClickHouse and GitLab service type filters and the development service class
+```
+
+```release-note:bug
+resource/aws_paas_service: Preserve dedicated coordinator instance types when resizing main nodes
+```
+
+```release-note:bug
+resource/aws_paas_service: Reject direct GitLab Registry storage changes during planning and explain the required disable-and-enable sequence
+```
