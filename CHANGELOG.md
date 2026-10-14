@@ -1,5 +1,22 @@
 ## 26.1.0 (Unreleased)
 
+FEATURES:
+
+* **New Resource:** `aws_paas_clickhouse_profile` ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/pull/193))
+* **New Resource:** `aws_paas_clickhouse_quota` ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/pull/193))
+* **New Resource:** `aws_paas_clickhouse_shard` ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/pull/193))
+
+ENHANCEMENTS:
+
+* data-source/aws_paas_backup, data-source/aws_paas_backups: Add ClickHouse and GitLab service type filters and the development service class ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/193))
+* resource/aws_paas_service, data-source/aws_paas_service: Add support for ClickHouse and GitLab services, requiring an explicit LDAP UID attribute for GitLab ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/193))
+* resource/aws_paas_service, data-source/aws_paas_service: Add support for ClickHouse coordinator roles and the total service instance count ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/193))
+
+BUG FIXES:
+
+* resource/aws_paas_service: Preserve dedicated coordinator instance types when resizing main nodes ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/193))
+* resource/aws_paas_service: Reject direct GitLab Registry storage changes during planning and explain the required disable-and-enable sequence ([#193](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/193))
+
 ## 26.0.1 (October 13, 2026)
 
 ENHANCEMENTS:
