@@ -505,7 +505,8 @@ The `user` block has the following structure:
 
 * `id` - The ID of the user.
 * `name` - The PostgreSQL user name.
-* `password` - The PostgreSQL user password.
+* `password` - The PostgreSQL user password when it is returned by the API. This attribute is sensitive.
+* `roles` - Set of predefined PostgreSQL roles assigned to this user across the service.
 
 ## Kafka Attribute Reference
 

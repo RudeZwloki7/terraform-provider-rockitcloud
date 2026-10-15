@@ -9,6 +9,9 @@ import (
 )
 
 func validateServiceConfiguration(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+	if err := validatePostgreSQLServiceConfiguration(d); err != nil {
+		return err
+	}
 	if err := validateKafkaServiceConfiguration(ctx, d, meta); err != nil {
 		return err
 	}

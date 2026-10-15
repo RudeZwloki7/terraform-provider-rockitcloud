@@ -307,6 +307,14 @@ func (s postgreSQLManager) serviceParametersDataSourceSchema() map[string]*schem
 
 func (s postgreSQLManager) userParametersSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
+		"roles": {
+			Type:     schema.TypeSet,
+			Optional: true,
+			Elem: &schema.Schema{
+				Type:         schema.TypeString,
+				ValidateFunc: validation.StringInSlice(postgreSQLUserRoles(), false),
+			},
+		},
 		"password": {
 			Type:      schema.TypeString,
 			Required:  true,
@@ -321,9 +329,15 @@ func (s postgreSQLManager) userParametersSchema() map[string]*schema.Schema {
 
 func (s postgreSQLManager) userParametersDataSourceSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
-		"password": {
-			Type:     schema.TypeString,
+		"roles": {
+			Type:     schema.TypeSet,
 			Computed: true,
+			Elem:     &schema.Schema{Type: schema.TypeString},
+		},
+		"password": {
+			Type:      schema.TypeString,
+			Computed:  true,
+			Sensitive: true,
 		},
 	}
 }
@@ -517,6 +531,11 @@ func (s postgreSQLManager) expandUserParameters(tfMap map[string]interface{}) Us
 	if v, ok := tfMap["password"].(string); ok && v != "" {
 		userParameters["password"] = v
 	}
+	// Older PaaS environments do not accept roles, even as an empty set.
+	// Removal of existing roles is handled by the service update request.
+	if v, ok := tfMap["roles"].(*schema.Set); ok && v.Len() > 0 {
+		userParameters["roles"] = v.List()
+	}
 
 	return userParameters
 }
@@ -700,6 +719,9 @@ func (s postgreSQLManager) flattenUserParameters(userParameters UserParameters) 
 
 	if v, ok := userParameters["password"].(string); ok {
 		tfMap["password"] = v
+	}
+	if v, ok := userParameters["roles"].([]interface{}); ok {
+		tfMap["roles"] = v
 	}
 
 	return tfMap
