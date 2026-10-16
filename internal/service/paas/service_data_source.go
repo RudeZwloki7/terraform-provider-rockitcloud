@@ -25,6 +25,30 @@ func DataSourceService() *schema.Resource {
 				Computed: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
+			"auto_disk_expansion": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"condition_value": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"enabled": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+						"max_size_gb": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"status": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
+			},
 			"available_environment_versions": {
 				Type:     schema.TypeSet,
 				Computed: true,

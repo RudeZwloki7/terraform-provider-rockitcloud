@@ -66,6 +66,37 @@ func ResourceService() *schema.Resource {
 				Computed: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
+			"auto_disk_expansion": {
+				Type:     schema.TypeList,
+				Optional: true,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"condition_value": {
+							Type:         schema.TypeInt,
+							Required:     true,
+							ValidateFunc: validation.IntBetween(autoDiskExpansionMinConditionValue, autoDiskExpansionMaxConditionValue),
+						},
+						"enabled": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Default:  true,
+						},
+						"max_size_gb": {
+							Type:     schema.TypeInt,
+							Required: true,
+							ValidateFunc: validation.All(
+								validation.IntAtLeast(autoDiskExpansionSizeMultipleGb),
+								validation.IntDivisibleBy(autoDiskExpansionSizeMultipleGb),
+							),
+						},
+						"status": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
+			},
 			"available_environment_versions": {
 				Type:     schema.TypeSet,
 				Computed: true,
@@ -170,9 +201,10 @@ func ResourceService() *schema.Resource {
 							DiffSuppressFunc: iopsDiffSuppressFunc,
 						},
 						"size": {
-							Type:     schema.TypeInt,
-							Optional: true,
-							Default:  32,
+							Type:             schema.TypeInt,
+							Optional:         true,
+							Default:          32,
+							DiffSuppressFunc: dataVolumeSizeDiffSuppressFunc,
 						},
 						"type": {
 							Type:     schema.TypeString,
@@ -494,6 +526,10 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 		input.InstanceQty = aws.Int64(int64(v.(int)))
 	}
 
+	if v, ok := d.GetOk("auto_disk_expansion"); ok && v.([]interface{})[0] != nil {
+		input.AdeSettings = expandAutoDiskExpansionSettings(v.([]interface{})[0].(map[string]interface{}))
+	}
+
 	if _, ok := d.GetOk("data_volume"); ok {
 		input.DataVolumeType = aws.String(d.Get("data_volume.0.type").(string))
 		input.DataVolumeSize = aws.Int64(int64(d.Get("data_volume.0.size").(int)))
@@ -556,10 +592,16 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 func resourceServiceRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	previousGitLabParameters, _ := d.GetOk(services.ServiceTypeGitLab)
+	autoDiskExpansionConfigured := len(d.Get("auto_disk_expansion").([]interface{})) > 0
 
 	diags := readService(ctx, d, meta)
 	if diags.HasError() || d.Id() == "" {
 		return diags
+	}
+
+	// Disabled auto disk expansion is equivalent to an omitted block.
+	if !autoDiskExpansionConfigured && !autoDiskExpansionEnabled(d.Get("auto_disk_expansion").([]interface{})) {
+		d.Set("auto_disk_expansion", nil)
 	}
 
 	serviceType := d.Get("service_type").(string)
@@ -611,7 +653,13 @@ func readService(ctx context.Context, d *schema.ResourceData, meta interface{}) 
 	}
 	d.Set("available_environment_versions", service.AvailableEnvironmentVersions)
 
-	d.Set("data_volume", dataVolumeMap)
+	if err := d.Set("auto_disk_expansion", flattenAutoDiskExpansionSettings(service.AutoDiskExpansionSettings)); err != nil {
+		return diag.Errorf("error setting auto_disk_expansion: %s", err)
+	}
+
+	if aws.StringValue(service.DataVolumeType) != "" {
+		d.Set("data_volume", dataVolumeMap)
+	}
 
 	d.Set("endpoints", flattenServiceEndpoints(service.Endpoints))
 
@@ -901,6 +949,17 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 
 		if err != nil {
 			return diag.Errorf("error waiting for PaaS Service (%s) data volume IOPS to update: %s", id, err)
+		}
+	}
+
+	if d.HasChange("auto_disk_expansion") && !d.IsNewResource() {
+		oldRaw, newRaw := d.GetChange("auto_disk_expansion")
+
+		// UpdateAutoDiskExpansionSettings only modifies the service settings and does not start a task.
+		if input := autoDiskExpansionUpdateInput(id, oldRaw.([]interface{}), newRaw.([]interface{})); input != nil {
+			if err := updateAutoDiskExpansionSettings(ctx, conn, input); err != nil {
+				return diag.Errorf("error modifying PaaS Service (%s) auto disk expansion settings: %s", id, err)
+			}
 		}
 	}
 

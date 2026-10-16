@@ -19,6 +19,10 @@ func validateServiceConfiguration(ctx context.Context, d *schema.ResourceDiff, m
 		return err
 	}
 
+	if err := validateAutoDiskExpansionConfiguration(ctx, d, meta); err != nil {
+		return err
+	}
+
 	return validatePrometheusServiceConfiguration(ctx, d, meta)
 }
 

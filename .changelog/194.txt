@@ -1,0 +1,3 @@
+```release-note:enhancement
+resource/aws_paas_service, data-source/aws_paas_service: Add support for automatic data volume expansion with the `auto_disk_expansion` block
+```

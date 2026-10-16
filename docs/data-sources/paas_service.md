@@ -32,6 +32,8 @@ The following arguments are supported:
 
 In addition to all arguments above, the following attributes are exported:
 
+* `auto_disk_expansion` - The auto volume expansion settings for the service. The structure of this block is [described below](#auto_disk_expansion).
+  The block is empty if auto volume expansion has never been configured for the service.
 * `available_environment_versions` - The environment versions to which the current version can be updated.
 * `auto_created_security_group_ids` - List of security group IDs that cloud created for the service.
 * `backup_settings` - The backup settings for the service. The structure of this block is [described below](#backup_settings).
@@ -70,6 +72,16 @@ In addition to all arguments above, the following attributes are exported:
 * `total_cpu_count` - Total number of CPU cores in use.
 * `total_memory` - Total RAM in use in MiB.
 * `vpc_id` - The ID of the VPC.
+
+### auto_disk_expansion
+
+The `auto_disk_expansion` block has the following structure:
+
+* `condition_value` - The utilization level of the data volume (in percent), upon exceeding which,
+  within 10 minutes on at least one node, automatic expansion is triggered.
+* `enabled` - Indicates whether auto volume expansion is enabled.
+* `max_size_gb` - The limit in GiB up to which the volume can be increased.
+* `status` - The current status of auto volume expansion (`active`, `warning`, `running` or `failed`).
 
 ### backup_settings
 
