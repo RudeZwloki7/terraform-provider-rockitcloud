@@ -657,7 +657,9 @@ func readService(ctx context.Context, d *schema.ResourceData, meta interface{}) 
 		return diag.Errorf("error setting auto_disk_expansion: %s", err)
 	}
 
-	d.Set("data_volume", dataVolumeMap)
+	if aws.StringValue(service.DataVolumeType) != "" {
+		d.Set("data_volume", dataVolumeMap)
+	}
 
 	d.Set("endpoints", flattenServiceEndpoints(service.Endpoints))
 
