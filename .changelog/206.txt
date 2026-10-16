@@ -1,0 +1,7 @@
+```release-note:enhancement
+resource/aws_paas_service: Add editable PostgreSQL user roles with version validation and explicit role revocation
+```
+
+```release-note:enhancement
+data-source/aws_paas_service: Export PostgreSQL user roles and mark PostgreSQL passwords as sensitive
+```

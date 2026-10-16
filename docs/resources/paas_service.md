@@ -1514,6 +1514,21 @@ The `user` block has the following structure:
 
 * `name` - (Required) The PostgreSQL user name.
 * `password` - (Required) The PostgreSQL user password. The value must not contain `'`, `"`, `` ` `` and `\`.
+* `roles` - (Optional, Editable) Set of predefined PostgreSQL roles assigned to this service user.
+  Requires PaaS environment `paas_v4_3` or later. Roles apply across the service, rather than to an individual database.
+  Set to `[]` or remove the argument to revoke all previously assigned roles without replacing the service.
+    * _Valid values:_ `pg_monitor`, `pg_read_all_settings`, `pg_read_all_stats`, `pg_stat_scan_tables`, `pg_signal_backend`,
+      `pg_create_subscription` (PostgreSQL 16 or later), `pg_maintain` (PostgreSQL 17 or later).
+
+For example, add the following user inside the `pgsql` block:
+
+```terraform
+user {
+  name     = "monitoring"
+  password = var.monitoring_password
+  roles    = ["pg_monitor", "pg_signal_backend"]
+}
+```
 
 ## Kafka argument reference
 

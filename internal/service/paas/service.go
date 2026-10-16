@@ -928,6 +928,11 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		if d.HasChange(userKey) {
 			if v, ok := d.GetOk(userKey); ok {
 				input.Users = manager.ExpandUsers(v.([]interface{}), false)
+				if serviceType == services.ServiceTypePostgreSQL {
+					previous, _ := d.GetChange(userKey)
+					previousUsers, _ := previous.([]interface{})
+					clearPostgreSQLUserRoles(input.Users, previousUsers)
+				}
 			} else {
 				input.Users = []*paas.UserCreateRequest{}
 			}

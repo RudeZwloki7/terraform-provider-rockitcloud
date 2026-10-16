@@ -33,6 +33,18 @@ func mySQLDatabaseUserPrivileges() []string {
 	}
 }
 
+func postgreSQLUserRoles() []string {
+	return []string{
+		"pg_monitor",
+		"pg_read_all_settings",
+		"pg_read_all_stats",
+		"pg_stat_scan_tables",
+		"pg_maintain",
+		"pg_signal_backend",
+		"pg_create_subscription",
+	}
+}
+
 func postgreSQLDatabaseExtensions() []string {
 	return []string{
 		"address_standardizer",
