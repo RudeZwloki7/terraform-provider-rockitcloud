@@ -1,5 +1,10 @@
 ## 26.2.0 (Unreleased)
 
+ENHANCEMENTS:
+
+* data-source/aws_paas_service: Export PostgreSQL user roles and mark PostgreSQL passwords as sensitive ([#206](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/206))
+* resource/aws_paas_service: Add editable PostgreSQL user roles with version validation and explicit role revocation ([#206](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/206))
+
 ## 26.1.0 (October 14, 2026)
 
 FEATURES:
