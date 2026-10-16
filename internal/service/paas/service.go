@@ -788,6 +788,59 @@ func preserveGitLabInputOnlyParameters(parameters []interface{}, previous interf
 	}
 }
 
+// changedServiceParameters returns only the expanded parameters whose Terraform attributes have changed.
+func changedServiceParameters(d *schema.ResourceData, serviceType string, parameters services.ServiceParameters) services.ServiceParameters {
+	prefix := serviceType + ".0."
+	// log_to and monitor_by are required while logging and monitoring are enabled, so they are passed with any change of the block.
+	attribute := map[string]string{
+		"log_to":            "logging",
+		"logging_tags":      "logging.0.logging_tags",
+		"monitor_by":        "monitoring",
+		"monitoring_labels": "monitoring.0.monitoring_labels",
+	}
+
+	output := services.ServiceParameters{}
+	for key, value := range parameters {
+		attr := key
+		if v, ok := attribute[key]; ok {
+			attr = v
+		}
+
+		if d.HasChange(prefix + attr) {
+			output[key] = value
+		}
+	}
+
+	// Expanders omit zero numeric values, so a changed attribute explicitly set to zero is passed separately.
+	if v, ok := d.Get(serviceType).([]interface{}); ok && len(v) > 0 && v[0] != nil {
+		for key, value := range v[0].(map[string]interface{}) {
+			if _, ok := output[key]; ok || !d.HasChange(prefix+key) {
+				continue
+			}
+
+			switch value {
+			case 0:
+				output[key] = int64(0)
+			case 0.0:
+				output[key] = 0.0
+			}
+		}
+	}
+
+	// PatchServiceParameters keeps omitted values, so removed tags and labels are passed as empty values.
+	for key, empty := range map[string]interface{}{
+		"logging_tags":      []interface{}{},
+		"monitoring_labels": map[string]interface{}{},
+	} {
+		block, _, _ := strings.Cut(attribute[key], ".")
+		if _, ok := output[key]; !ok && output[block] == true && d.HasChange(prefix+attribute[key]) {
+			output[key] = empty
+		}
+	}
+
+	return output
+}
+
 func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	conn := meta.(*conns.AWSClient).PaaSConn
 	id := d.Id()
@@ -892,21 +945,41 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			manager.ExpandServiceParameters(parametersMap),
 		)
 
-		log.Printf("[DEBUG] Modifying PaaS %s Service (%s) parameters", serviceType, id)
-		_, err := conn.ModifyServiceParametersWithContext(
-			ctx,
-			input,
-			request.WithLogLevel(aws.LogOff),
-		)
+		var err error
+		modified := true
+		if serviceType == services.ServiceTypePostgreSQL {
+			// PatchServiceParameters changes only the passed parameters, so values set outside
+			// of Terraform (for example, PgBouncer parameters) are preserved.
+			patchInput := &paas.PatchServiceParametersInput{
+				ServiceId:  aws.String(id),
+				Parameters: changedServiceParameters(d, serviceType, input.Parameters),
+			}
+
+			// Users and databases are updated with ModifyService below.
+			modified = len(patchInput.Parameters) > 0
+			if modified {
+				log.Printf("[DEBUG] Patching PaaS Service parameters: %s", patchInput)
+				_, err = conn.PatchServiceParametersWithContext(ctx, patchInput)
+			}
+		} else {
+			log.Printf("[DEBUG] Modifying PaaS %s Service (%s) parameters", serviceType, id)
+			_, err = conn.ModifyServiceParametersWithContext(
+				ctx,
+				input,
+				request.WithLogLevel(aws.LogOff),
+			)
+		}
 
 		if err != nil {
 			return diag.Errorf("error modifying PaaS Service (%s) parameters: %s", id, err)
 		}
 
-		_, err = waitServiceUpdated(ctx, conn, id, d.Timeout(schema.TimeoutUpdate))
+		if modified {
+			_, err = waitServiceUpdated(ctx, conn, id, d.Timeout(schema.TimeoutUpdate))
 
-		if err != nil {
-			return diag.Errorf("error waiting for PaaS Service (%s) parameters to update: %s", id, err)
+			if err != nil {
+				return diag.Errorf("error waiting for PaaS Service (%s) parameters to update: %s", id, err)
+			}
 		}
 	}
 

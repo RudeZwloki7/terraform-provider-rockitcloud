@@ -1,104 +1,391 @@
-package paas_test
+package paas
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
-	"strconv"
+	"net/http"
+	"reflect"
+	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/paas"
-	sdkacctest "github.com/hashicorp/terraform-plugin-sdk/v2/helper/acctest"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-provider-aws/internal/acctest"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
+	"github.com/hashicorp/terraform-provider-aws/internal/service/paas/services"
 )
 
-func TestAccPaaSServicePostgreSQL_roles(t *testing.T) {
-	const resourceName = "aws_paas_service.test"
-	name := "tf-pgsql-" + sdkacctest.RandString(5)
-	publicKey, _, err := sdkacctest.RandSSHKeyPair(acctest.DefaultEmailAddress)
+func TestResourceServicePostgreSQLParametersDoNotRequireReplacement(t *testing.T) {
+	t.Parallel()
+
+	resource := ResourceService()
+	resourceData := schema.TestResourceDataRaw(t, resource.Schema, testPostgreSQLServiceConfig(map[string]interface{}{
+		"version":         "18",
+		"work_mem":        "4194304",
+		"max_connections": 100,
+		"options": map[string]interface{}{
+			"jit": "on",
+		},
+	}))
+	resourceData.SetId("fm-cluster-12345678")
+
+	diff, err := resource.Diff(
+		context.Background(),
+		resourceData.State(),
+		terraform.NewResourceConfigRaw(testPostgreSQLServiceConfig(map[string]interface{}{
+			"version":              "18",
+			"work_mem":             "8388608",
+			"max_connections":      200,
+			"max_parallel_workers": 0,
+			"options": map[string]interface{}{
+				"jit": "off",
+			},
+		})),
+		nil,
+	)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("calculating PostgreSQL diff: %s", err)
 	}
-	var serviceID string
-	var steps []resource.TestStep
-	for _, roles := range [][]string{
-		nil,
-		{"pg_monitor"},
-		{"pg_monitor", "pg_read_all_settings", "pg_read_all_stats", "pg_stat_scan_tables", "pg_signal_backend", "pg_maintain", "pg_create_subscription"},
-		{"pg_signal_backend"},
-		{},
-		{"pg_read_all_settings"},
-		nil,
-	} {
-		attributes := map[string]string{"name": "application", "roles.#": strconv.Itoa(len(roles))}
-		for _, role := range roles {
-			attributes["roles."+strconv.Itoa(schema.HashSchema(&schema.Schema{Type: schema.TypeString})(role))] = role
-		}
-		steps = append(steps, resource.TestStep{
-			Config: testAccServicePostgreSQLRolesConfig(name, publicKey, roles),
-			Check: resource.ComposeTestCheckFunc(
-				testAccCheckServiceExists(resourceName),
-				resource.TestCheckResourceAttrWith(resourceName, "id", func(id string) error {
-					if serviceID != "" && id != serviceID {
-						return fmt.Errorf("PostgreSQL service replaced: %s -> %s", serviceID, id)
-					}
-					serviceID = id
-					return nil
-				}),
-				resource.TestCheckResourceAttr(resourceName, "pgsql.0.user.0.roles.#", strconv.Itoa(len(roles))),
-				resource.TestCheckTypeSetElemNestedAttrs("data.aws_paas_service.test", "pgsql.0.user.*", attributes),
-			),
-		})
+	if diff == nil || diff.Empty() {
+		t.Fatal("parameters update unexpectedly produced an empty diff")
 	}
-	resource.ParallelTest(t, resource.TestCase{
-		PreCheck:          func() { testAccServicePreCheck(t) },
-		ErrorCheck:        acctest.ErrorCheck(t, paas.EndpointsID),
-		ProviderFactories: acctest.ProviderFactories,
-		CheckDestroy:      testAccCheckServiceDestroy,
-		Steps:             steps,
-	})
+	if diff.RequiresNew() {
+		t.Fatalf("parameters update unexpectedly requires PostgreSQL replacement: %#v", diff.Attributes)
+	}
 }
 
-func testAccServicePostgreSQLRolesConfig(name, publicKey string, roles []string) string {
-	roleArgument := ""
-	if roles != nil {
-		encoded, _ := json.Marshal(roles)
-		roleArgument = "roles = " + string(encoded)
+func TestResourceServicePostgreSQLVersionRequiresReplacement(t *testing.T) {
+	t.Parallel()
+
+	resource := ResourceService()
+
+	for name, parameters := range map[string][2]map[string]interface{}{
+		"version": {
+			{"version": "17"},
+			{"version": "18"},
+		},
+		"replication_mode": {
+			{"version": "18", "replication_mode": "asynchronous"},
+			{"version": "18", "replication_mode": "synchronous"},
+		},
+	} {
+		resourceData := schema.TestResourceDataRaw(t, resource.Schema, testPostgreSQLServiceConfig(parameters[0]))
+		resourceData.SetId("fm-cluster-12345678")
+
+		diff, err := resource.Diff(
+			context.Background(),
+			resourceData.State(),
+			terraform.NewResourceConfigRaw(testPostgreSQLServiceConfig(parameters[1])),
+			nil,
+		)
+		if err != nil {
+			t.Fatalf("calculating PostgreSQL %s diff: %s", name, err)
+		}
+		if diff == nil || !diff.RequiresNew() {
+			t.Fatalf("%s update must require PostgreSQL replacement: %#v", name, diff)
+		}
 	}
-	return testAccServiceConfigCompose(name, name, publicKey, fmt.Sprintf(`
-resource "aws_paas_service" "test" {
-  depends_on = [aws_route.test]
-  name          = %[1]q
-  instance_type = "c5.large"
-  arbitrator_required = false
-  root_volume {
-    type = "gp2"
-    size = 32
-  }
-  data_volume {
-    type = "gp2"
-    size = 32
-  }
-  delete_interfaces_on_destroy = true
-  security_group_ids = [aws_vpc.test.default_security_group_id]
-  subnet_ids = [aws_subnet.test.id]
-  ssh_key_name = aws_key_pair.test.key_name
-  pgsql {
-    version = "18"
-    user {
-      name = "application"
-      password = "Test_pgsql_password1"
-      %[2]s
-    }
-    database {
-      name = "appdb"
-      owner = "application"
-    }
-  }
 }
-data "aws_paas_service" "test" {
-  id = aws_paas_service.test.id
+
+func TestResourceServicePostgreSQLRemovedParameterKeepsValue(t *testing.T) {
+	t.Parallel()
+
+	resource := ResourceService()
+	resourceData := schema.TestResourceDataRaw(t, resource.Schema, testPostgreSQLServiceConfig(map[string]interface{}{
+		"version":                          "18",
+		"work_mem":                         "8388608",
+		"max_parallel_maintenance_workers": 3,
+		"wal_keep_segments":                5,
+	}))
+	resourceData.SetId("fm-cluster-12345678")
+
+	diff, err := resource.Diff(
+		context.Background(),
+		resourceData.State(),
+		terraform.NewResourceConfigRaw(testPostgreSQLServiceConfig(map[string]interface{}{
+			"version": "18",
+		})),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("calculating PostgreSQL diff: %s", err)
+	}
+	if diff == nil {
+		return
+	}
+	for key, attrDiff := range diff.Attributes {
+		if strings.HasPrefix(key, services.ServiceTypePostgreSQL+".") {
+			t.Fatalf("removed parameter unexpectedly produced a diff: %s: %#v", key, attrDiff)
+		}
+	}
 }
-`, name, roleArgument))
+
+func TestChangedServiceParametersPostgreSQL(t *testing.T) {
+	t.Parallel()
+
+	got := testPostgreSQLChangedServiceParameters(t,
+		map[string]interface{}{
+			"version":              "18",
+			"work_mem":             "4194304",
+			"max_connections":      100,
+			"max_parallel_workers": 4,
+			"options": map[string]interface{}{
+				"jit": "on",
+			},
+		},
+		map[string]interface{}{
+			"version":              "18",
+			"work_mem":             "8388608",
+			"max_connections":      100,
+			"max_parallel_workers": 0,
+			"options": map[string]interface{}{
+				"jit": "on",
+			},
+		},
+	)
+	want := services.ServiceParameters{
+		"work_mem": map[string]interface{}{
+			"dimension": services.B,
+			"value":     int64(8388608),
+		},
+		"max_parallel_workers": int64(0),
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected PostgreSQL patch parameters: got %#v want %#v", got, want)
+	}
 }
+
+func TestChangedServiceParametersPostgreSQLUsersOnly(t *testing.T) {
+	t.Parallel()
+
+	user := []interface{}{
+		map[string]interface{}{
+			"name":     "user1",
+			"password": "password1",
+		},
+	}
+
+	got := testPostgreSQLChangedServiceParameters(t,
+		map[string]interface{}{
+			"version":         "18",
+			"max_connections": 100,
+		},
+		map[string]interface{}{
+			"version":         "18",
+			"max_connections": 100,
+			"user":            user,
+		},
+	)
+
+	if len(got) != 0 {
+		t.Fatalf("users change unexpectedly produced patch parameters: %#v", got)
+	}
+}
+
+func TestChangedServiceParametersPostgreSQLLoggingMonitoring(t *testing.T) {
+	t.Parallel()
+
+	logging := func(logTo string, tags ...interface{}) []interface{} {
+		return []interface{}{map[string]interface{}{"log_to": logTo, "logging_tags": tags}}
+	}
+	monitoring := func(monitorBy string, labels map[string]interface{}) []interface{} {
+		return []interface{}{map[string]interface{}{"monitor_by": monitorBy, "monitoring_labels": labels}}
+	}
+
+	for name, tc := range map[string]struct {
+		old, new map[string]interface{}
+		want     services.ServiceParameters
+	}{
+		"logging tags removed": {
+			old: map[string]interface{}{"version": "18", "logging": logging("fm-cluster-1", "a", "b")},
+			new: map[string]interface{}{"version": "18", "logging": logging("fm-cluster-1")},
+			want: services.ServiceParameters{
+				"logging":      true,
+				"log_to":       "fm-cluster-1",
+				"logging_tags": []interface{}{},
+			},
+		},
+		"logging tags unchanged": {
+			old: map[string]interface{}{"version": "18", "logging": logging("fm-cluster-1", "a")},
+			new: map[string]interface{}{"version": "18", "logging": logging("fm-cluster-2", "a")},
+			want: services.ServiceParameters{
+				"logging": true,
+				"log_to":  "fm-cluster-2",
+			},
+		},
+		"logging disabled": {
+			old: map[string]interface{}{"version": "18", "logging": logging("fm-cluster-1", "a")},
+			new: map[string]interface{}{"version": "18"},
+			want: services.ServiceParameters{
+				"logging": false,
+			},
+		},
+		"monitoring labels removed": {
+			old: map[string]interface{}{"version": "18", "monitoring": monitoring("fm-cluster-1", map[string]interface{}{"env": "prod"})},
+			new: map[string]interface{}{"version": "18", "monitoring": monitoring("fm-cluster-1", nil)},
+			want: services.ServiceParameters{
+				"monitoring":        true,
+				"monitor_by":        "fm-cluster-1",
+				"monitoring_labels": map[string]interface{}{},
+			},
+		},
+	} {
+		if got := testPostgreSQLChangedServiceParameters(t, tc.old, tc.new); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: unexpected PostgreSQL patch parameters: got %#v want %#v", name, got, tc.want)
+		}
+	}
+}
+
+func TestExpandServiceParametersPostgreSQLOmitsUnsetParameters(t *testing.T) {
+	t.Parallel()
+
+	resource := ResourceService()
+	resourceData := schema.TestResourceDataRaw(t, resource.Schema, testPostgreSQLServiceConfig(map[string]interface{}{
+		"version":              "18",
+		"effective_cache_size": "4294967296",
+		"shared_buffers":       "1073741824",
+	}))
+
+	got := services.Manager(services.ServiceTypePostgreSQL).ExpandServiceParameters(
+		resourceData.Get(services.ServiceTypePostgreSQL).([]interface{})[0].(map[string]interface{}),
+	)
+	want := services.ServiceParameters{
+		"logging":    false,
+		"monitoring": false,
+		"version":    "18",
+		"effective_cache_size": map[string]interface{}{
+			"dimension": services.B,
+			"value":     int64(4294967296),
+		},
+		"shared_buffers": map[string]interface{}{
+			"dimension": services.B,
+			"value":     int64(1073741824),
+		},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected PostgreSQL create parameters: got %#v want %#v", got, want)
+	}
+}
+
+func TestResourceServicePostgreSQLUpdateRequests(t *testing.T) {
+	t.Parallel()
+
+	user := []interface{}{map[string]interface{}{"name": "user1", "password": "password1"}}
+	servicePath := "/services/" + testPostgreSQLServiceID
+
+	for name, tc := range map[string]struct {
+		new        map[string]interface{}
+		wantEvents []string
+		wantPatch  map[string]interface{}
+	}{
+		"parameter changed": {
+			new:        map[string]interface{}{"version": "18", "work_mem": "8388608"},
+			wantEvents: []string{"PATCH " + servicePath + "/parameters", "GET " + servicePath, "GET " + servicePath},
+			wantPatch:  map[string]interface{}{"work_mem": map[string]interface{}{"dimension": "B", "value": 8388608.0}},
+		},
+		"users only": {
+			new:        map[string]interface{}{"version": "18", "work_mem": "4194304", "user": user},
+			wantEvents: []string{"PUT " + servicePath, "GET " + servicePath, "GET " + servicePath},
+		},
+	} {
+		resource := ResourceService()
+		initial := schema.TestResourceDataRaw(t, resource.Schema, testPostgreSQLServiceConfig(map[string]interface{}{"version": "18", "work_mem": "4194304"}))
+		initial.SetId(testPostgreSQLServiceID)
+		diff, err := resource.Diff(context.Background(), initial.State(), terraform.NewResourceConfigRaw(testPostgreSQLServiceConfig(tc.new)), nil)
+		if err != nil {
+			t.Fatalf("%s: calculating PostgreSQL diff: %s", name, err)
+		}
+		data, err := schema.InternalMap(resource.Schema).Data(initial.State(), diff)
+		if err != nil {
+			t.Fatalf("%s: building PostgreSQL resource data: %s", name, err)
+		}
+
+		var events []string
+		var patch map[string]interface{}
+		conn := testPaaSClientWithDebugBodyLogging(&recordingSDKLogger{}, roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			events = append(events, request.Method+" "+request.URL.Path)
+			if request.Method == http.MethodPatch {
+				patch = testGitLabInternalRequestParameters(t, request)
+			}
+			return jsonResponse(request, testPostgreSQLServiceResponse(t)), nil
+		}))
+		if diags := resourceServiceUpdate(context.Background(), data, testPaaSClientMeta(conn)); diags.HasError() {
+			t.Fatalf("%s: updating PostgreSQL service: %#v", name, diags)
+		}
+		if !reflect.DeepEqual(events, tc.wantEvents) {
+			t.Errorf("%s: unexpected PaaS requests: got %#v want %#v", name, events, tc.wantEvents)
+		}
+		if !reflect.DeepEqual(patch, tc.wantPatch) {
+			t.Errorf("%s: unexpected PostgreSQL patch parameters: got %#v want %#v", name, patch, tc.wantPatch)
+		}
+	}
+}
+
+func testPostgreSQLServiceResponse(t *testing.T) string {
+	t.Helper()
+
+	body, err := json.Marshal(map[string]interface{}{"service": map[string]interface{}{
+		"id": testPostgreSQLServiceID, "name": "tf-pgsql-test", "serviceType": services.ServiceTypePostgreSQL, "serviceClass": "database", "status": "READY",
+		"instanceType": "c5.large", "rootVolumeType": "gp2", "rootVolumeSize": 32, "dataVolumeType": "gp2", "dataVolumeSize": 32,
+		"subnetIds": []string{"subnet-12345678"}, "parameters": map[string]interface{}{"version": "18"},
+	}})
+	if err != nil {
+		t.Fatalf("encoding PostgreSQL HTTP response fixture: %s", err)
+	}
+	return string(body)
+}
+
+func testPostgreSQLChangedServiceParameters(t *testing.T, oldParameters, newParameters map[string]interface{}) services.ServiceParameters {
+	t.Helper()
+
+	resource := ResourceService()
+	resourceData := schema.TestResourceDataRaw(t, resource.Schema, testPostgreSQLServiceConfig(oldParameters))
+	resourceData.SetId("fm-cluster-12345678")
+	state := resourceData.State()
+
+	diff, err := resource.Diff(
+		context.Background(),
+		state,
+		terraform.NewResourceConfigRaw(testPostgreSQLServiceConfig(newParameters)),
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("calculating PostgreSQL diff: %s", err)
+	}
+
+	d, err := schema.InternalMap(resource.Schema).Data(state, diff)
+	if err != nil {
+		t.Fatalf("building PostgreSQL resource data: %s", err)
+	}
+
+	parameters := services.Manager(services.ServiceTypePostgreSQL).ExpandServiceParameters(
+		d.Get(services.ServiceTypePostgreSQL).([]interface{})[0].(map[string]interface{}),
+	)
+
+	return changedServiceParameters(d, services.ServiceTypePostgreSQL, parameters)
+}
+
+func testPostgreSQLServiceConfig(pgsqlParameters map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"name":          "tf-pgsql-test",
+		"instance_type": "c5.large",
+		"root_volume": []interface{}{
+			map[string]interface{}{
+				"type": "gp2",
+				"size": 32,
+			},
+		},
+		"data_volume": []interface{}{
+			map[string]interface{}{
+				"type": "gp2",
+				"size": 32,
+			},
+		},
+		"subnet_ids": []interface{}{"subnet-12345678"},
+		services.ServiceTypePostgreSQL: []interface{}{
+			pgsqlParameters,
+		},
+	}
+}
+
+const testPostgreSQLServiceID = "fm-cluster-12345678"
