@@ -1398,8 +1398,7 @@ The following arguments are required:
 * `version` - (Required) The version to install. The list of supported versions is available in the [user documentation][pgsql-version].
 
 The following arguments are optional. Except for `replication_mode`, they can be updated without recreating the service:
-only changed arguments are sent with `PatchServiceParameters`. An argument removed from the configuration keeps its current value
-(`max_parallel_maintenance_workers` and `wal_keep_segments` keep showing a diff until set explicitly).
+only changed arguments are sent with `PatchServiceParameters`. An argument removed from the configuration keeps its current value.
 
 * `autovacuum` - (Optional) Indicates whether the server must run the autovacuum launcher daemon.
     * _Valid values:_ `ON`, `OFF`

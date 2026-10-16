@@ -90,8 +90,10 @@ func TestResourceServicePostgreSQLRemovedParameterKeepsValue(t *testing.T) {
 
 	resource := ResourceService()
 	resourceData := schema.TestResourceDataRaw(t, resource.Schema, testPostgreSQLServiceConfig(map[string]interface{}{
-		"version":  "18",
-		"work_mem": "8388608",
+		"version":                          "18",
+		"work_mem":                         "8388608",
+		"max_parallel_maintenance_workers": 3,
+		"wal_keep_segments":                5,
 	}))
 	resourceData.SetId("fm-cluster-12345678")
 

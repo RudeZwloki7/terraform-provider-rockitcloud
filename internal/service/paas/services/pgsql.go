@@ -117,7 +117,7 @@ func (s postgreSQLManager) serviceParametersSchema() map[string]*schema.Schema {
 		"max_parallel_maintenance_workers": {
 			Type:         schema.TypeInt,
 			Optional:     true,
-			Default:      postgreSQLMaxParallelMaintenanceWorkersDefault,
+			Computed:     true,
 			ValidateFunc: validation.IntBetween(0, 1024),
 		},
 		"max_parallel_workers": {
@@ -184,7 +184,7 @@ func (s postgreSQLManager) serviceParametersSchema() map[string]*schema.Schema {
 		"wal_keep_segments": {
 			Type:         schema.TypeInt,
 			Optional:     true,
-			Default:      postgreSQLWalKeepSegmentsDefault,
+			Computed:     true,
 			ValidateFunc: validation.IntBetween(0, 2147483647),
 		},
 		"wal_buffers": {
@@ -465,7 +465,7 @@ func (s postgreSQLManager) expandServiceParameters(tfMap map[string]interface{})
 		}
 	}
 
-	if v, ok := tfMap["max_parallel_maintenance_workers"].(int); ok && v != postgreSQLMaxParallelMaintenanceWorkersDefault {
+	if v, ok := tfMap["max_parallel_maintenance_workers"].(int); ok && v != 0 && v != postgreSQLMaxParallelMaintenanceWorkersDefault {
 		serviceParameters["max_parallel_maintenance_workers"] = int64(v)
 	}
 
@@ -507,7 +507,7 @@ func (s postgreSQLManager) expandServiceParameters(tfMap map[string]interface{})
 		serviceParameters["version"] = v
 	}
 
-	if v, ok := tfMap["wal_keep_segments"].(int); ok && v != postgreSQLWalKeepSegmentsDefault {
+	if v, ok := tfMap["wal_keep_segments"].(int); ok && v != 0 && v != postgreSQLWalKeepSegmentsDefault {
 		serviceParameters["wal_keep_segments"] = int64(v)
 	}
 
