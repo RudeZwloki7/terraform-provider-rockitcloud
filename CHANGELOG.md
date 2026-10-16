@@ -1,5 +1,15 @@
 ## 26.2.0 (Unreleased)
 
+ENHANCEMENTS:
+
+* resource/aws_paas_service: update PostgreSQL parameters (except `version` and `replication_mode`) in place with `PatchServiceParameters` instead of recreating the service ([#210](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/210))
+
+BUG FIXES:
+
+* resource/aws_paas_service: do not send unset `effective_io_concurrency`, `max_parallel_workers`, `max_parallel_workers_per_gather` and `max_worker_processes` PostgreSQL parameters as `0` on service creation ([#210](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/210))
+* resource/aws_paas_service: do not show a permanent diff for PostgreSQL `max_parallel_maintenance_workers` and `wal_keep_segments` removed from the configuration ([#210](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/210))
+* resource/aws_paas_service: send PostgreSQL `effective_cache_size` and `shared_buffers` parameters in bytes with an explicit dimension ([#210](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/210))
+
 ## 26.1.1 (October 16, 2026)
 
 ENHANCEMENTS:
