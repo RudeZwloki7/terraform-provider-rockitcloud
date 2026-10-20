@@ -547,7 +547,7 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 	input.ServiceType = aws.String(manager.ServiceType())
 
-	parametersMap := d.Get(manager.ServiceType()).([]interface{})[0].(map[string]interface{})
+	parametersMap := serviceParametersFromResourceData(d, manager.ServiceType())
 	input.ServiceClass = aws.String(parametersMap["class"].(string))
 
 	input.Parameters = manager.ExpandServiceCreationParameters(parametersMap)
@@ -992,7 +992,7 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	parametersMap := d.Get(serviceType).([]interface{})[0].(map[string]interface{})
+	parametersMap := serviceParametersFromResourceData(d, serviceType)
 
 	if d.HasChange(serviceType) && (!d.IsNewResource() || manager.HasDeferredParameters(parametersMap)) {
 		input := &paas.ModifyServiceParametersInput{

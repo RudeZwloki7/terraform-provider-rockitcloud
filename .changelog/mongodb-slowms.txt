@@ -1,0 +1,3 @@
+```release-note:bug
+resource/aws_paas_service: Omit an unspecified MongoDB slowms parameter from API requests while preserving an explicitly configured zero
+```
