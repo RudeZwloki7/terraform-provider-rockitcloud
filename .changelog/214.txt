@@ -1,0 +1,3 @@
+```release-note:enhancement
+resource/aws_lb_target_group: allow `health_check.port` to be a port number for HTTP target groups
+```
