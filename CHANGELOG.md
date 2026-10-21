@@ -1,4 +1,4 @@
-## 26.2.0 (October 16, 2026)
+## 26.2.1 (October 21, 2026)
 
 ENHANCEMENTS:
 
