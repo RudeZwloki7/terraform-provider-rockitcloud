@@ -2,6 +2,12 @@
 
 ENHANCEMENTS:
 
+* resource/aws_lb_target_group: allow `health_check.port` to be a port number for HTTP target groups ([#214](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/214))
+
+## 26.2.0 (October 16, 2026)
+
+ENHANCEMENTS:
+
 * resource/aws_paas_service, data-source/aws_paas_service: Add support for automatic data volume expansion with the `auto_disk_expansion` block ([#194](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/194))
 * resource/aws_paas_service: update PostgreSQL parameters (except `version` and `replication_mode`) in place with `PatchServiceParameters` instead of recreating the service ([#210](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/210))
 
