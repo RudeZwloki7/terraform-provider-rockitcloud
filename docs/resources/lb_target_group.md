@@ -89,8 +89,11 @@ The `health_check` block has the following structure:
     * _Default value:_ 30
 * `port` - (Optional, Editable) The port used to perform health checks on targets.
   If value is `traffic-port`, the port, on which the target receives requests, is used for health checks.
-    * _Valid values:_ `traffic-port`
+    * _Valid values:_
+        * `traffic-port`
+        * From 1 to 65535
     * _Default value:_ `traffic-port`
+    * _Constraints:_ A port number can be specified for HTTP target groups only
 * `protocol` - (Optional, Editable) The protocol used to perform health checks on targets.
     * _Valid values:_ `TCP`, `UDP`, `HTTP`
     * _Constraints:_ `health_check.protocol` and target group `protocol` must be the same
