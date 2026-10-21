@@ -9,6 +9,9 @@ import (
 )
 
 func validateServiceConfiguration(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+	if err := validateMySQLServiceConfiguration(d); err != nil {
+		return err
+	}
 	if err := validatePostgreSQLServiceConfiguration(d); err != nil {
 		return err
 	}

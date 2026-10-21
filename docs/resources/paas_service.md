@@ -1255,6 +1255,13 @@ The following arguments are required:
 
 The following arguments are optional:
 
+* `bin_log_enabled` - (Optional, Editable) Indicates whether the binary log is enabled. Requires environment version `paas_v4_3` or later.
+  If omitted, the current service setting is preserved. Set to `false` to disable the binary log.
+  Changes restart the service nodes one by one.
+* `binlog_retention_days` - (Optional, Editable) The binary log retention period in days.
+    * _Valid values:_ From 1 to 365
+    * _Default value:_ `7` when the binary log is enabled
+    * _Constraints:_ The parameter can be set only if `bin_log_enabled` is `true`
 * `class` - (Optional) The service class.
     * _Valid values:_ `database`
     * _Default value:_ `database`
@@ -1412,6 +1419,10 @@ The following arguments are required:
 
 The following arguments are optional:
 
+* `global_privileges` - (Optional) Set of privileges on all databases, including system databases (`*.*`).
+  Removing this argument or setting it to an empty set revokes the global privileges.
+  Database-specific grants are configured in `database.user.privileges`.
+    * _Valid values:_ `REPLICATION SLAVE`, `REPLICATION CLIENT`, `SELECT`, `RELOAD`, `SHOW DATABASES`
 * `host` - (Optional) The hostname or IP address. The value must be 1 to 60 characters long.
 
 ## PostgreSQL argument reference

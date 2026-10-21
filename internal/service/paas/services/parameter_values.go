@@ -10,6 +10,16 @@ const (
 	postgreSQLWalKeepSegmentsDefault               = -1
 )
 
+func mySQLGlobalPrivileges() []string {
+	return []string{
+		"REPLICATION SLAVE",
+		"REPLICATION CLIENT",
+		"SELECT",
+		"RELOAD",
+		"SHOW DATABASES",
+	}
+}
+
 func mySQLDatabaseUserPrivileges() []string {
 	return []string{
 		"ALL",

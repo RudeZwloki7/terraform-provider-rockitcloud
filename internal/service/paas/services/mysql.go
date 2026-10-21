@@ -30,6 +30,18 @@ var MySQL = mySQLManager{
 
 func (s mySQLManager) serviceParametersSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
+		"bin_log_enabled": {
+			Type:         nullable.TypeNullableBool,
+			Optional:     true,
+			Computed:     true,
+			ValidateFunc: nullable.ValidateTypeStringNullableBool,
+		},
+		"binlog_retention_days": {
+			Type:         schema.TypeInt,
+			Optional:     true,
+			Computed:     true,
+			ValidateFunc: validation.IntBetween(1, 365),
+		},
 		"connect_timeout": {
 			Type:         schema.TypeInt,
 			Optional:     true,
@@ -249,6 +261,14 @@ func (s mySQLManager) serviceParametersSchema() map[string]*schema.Schema {
 
 func (s mySQLManager) serviceParametersDataSourceSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
+		"bin_log_enabled": {
+			Type:     nullable.TypeNullableBool,
+			Computed: true,
+		},
+		"binlog_retention_days": {
+			Type:     schema.TypeInt,
+			Computed: true,
+		},
 		"connect_timeout": {
 			Type:     schema.TypeInt,
 			Computed: true,
@@ -384,6 +404,14 @@ func (s mySQLManager) serviceParametersDataSourceSchema() map[string]*schema.Sch
 
 func (s mySQLManager) userParametersSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
+		"global_privileges": {
+			Type:     schema.TypeSet,
+			Optional: true,
+			Elem: &schema.Schema{
+				Type:         schema.TypeString,
+				ValidateFunc: validation.StringInSlice(mySQLGlobalPrivileges(), false),
+			},
+		},
 		"host": {
 			Type:         schema.TypeString,
 			Optional:     true,
@@ -403,6 +431,11 @@ func (s mySQLManager) userParametersSchema() map[string]*schema.Schema {
 
 func (s mySQLManager) userParametersDataSourceSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
+		"global_privileges": {
+			Type:     schema.TypeSet,
+			Computed: true,
+			Elem:     &schema.Schema{Type: schema.TypeString},
+		},
 		"host": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -498,6 +531,16 @@ func (s mySQLManager) expandServiceParameters(tfMap map[string]interface{}) Serv
 	}
 
 	serviceParameters := ServiceParameters{}
+
+	if v, ok := tfMap["bin_log_enabled"].(string); ok {
+		if enabled, null, _ := nullable.Bool(v).Value(); !null {
+			serviceParameters["bin_log_enabled"] = enabled
+			// The API accepts retention only when the binary log is enabled.
+			if days, ok := tfMap["binlog_retention_days"].(int); enabled && ok && days != 0 {
+				serviceParameters["binlog_retention_days"] = int64(days)
+			}
+		}
+	}
 
 	if v, ok := tfMap["connect_timeout"].(int); ok && v != 0 {
 		serviceParameters["connect_timeout"] = int64(v)
@@ -655,6 +698,10 @@ func (s mySQLManager) expandUserParameters(tfMap map[string]interface{}) UserPar
 
 	userParameters := UserParameters{}
 
+	if v, ok := tfMap["global_privileges"].(*schema.Set); ok && v.Len() > 0 {
+		userParameters["global_privileges"] = v.List()
+	}
+
 	if v, ok := tfMap["host"].(string); ok && v != "" {
 		userParameters["host"] = v
 	}
@@ -716,6 +763,14 @@ func (s mySQLManager) flattenServiceParameters(serviceParameters ServiceParamete
 	}
 
 	tfMap := map[string]interface{}{}
+
+	if v, ok := serviceParameters["binLogEnabled"].(bool); ok {
+		tfMap["bin_log_enabled"] = strconv.FormatBool(v)
+	}
+
+	if v, ok := serviceParameters["binlogRetentionDays"].(int64); ok {
+		tfMap["binlog_retention_days"] = v
+	}
 
 	if v, ok := serviceParameters["connectTimeout"].(int64); ok {
 		tfMap["connect_timeout"] = v
@@ -884,6 +939,10 @@ func (s mySQLManager) flattenUserParameters(userParameters UserParameters) map[s
 	}
 
 	tfMap := map[string]interface{}{}
+
+	if v, ok := userParameters["global_privileges"].([]interface{}); ok {
+		tfMap["global_privileges"] = v
+	}
 
 	if v, ok := userParameters["host"].(string); ok {
 		tfMap["host"] = v
