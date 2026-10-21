@@ -413,6 +413,59 @@ func TestAccELBV2TargetGroup_basic(t *testing.T) {
 	})
 }
 
+func TestAccELBV2TargetGroup_healthCheckPort(t *testing.T) {
+	var conf elbv2.TargetGroup
+	rName := sdkacctest.RandomWithPrefix(acctest.ResourcePrefix)
+	resourceName := "aws_lb_target_group.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:          func() { acctest.PreCheck(t) },
+		ErrorCheck:        acctest.ErrorCheck(t, elbv2.EndpointsID),
+		ProviderFactories: acctest.ProviderFactories,
+		CheckDestroy:      testAccCheckTargetGroupDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccTargetGroupConfig_healthCheckPort(rName, "HTTP", "8081"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckTargetGroupExists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "health_check.0.port", "8081"),
+				),
+			},
+			{
+				Config: testAccTargetGroupConfig_healthCheckPort(rName, "HTTP", "8082"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckTargetGroupExists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "health_check.0.port", "8082"),
+				),
+			},
+			{
+				Config: testAccTargetGroupConfig_healthCheckPort(rName, "HTTP", "traffic-port"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckTargetGroupExists(resourceName, &conf),
+					resource.TestCheckResourceAttr(resourceName, "health_check.0.port", "traffic-port"),
+				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"connection_termination",
+					"deregistration_delay",
+					"lambda_multi_value_headers_enabled",
+					"proxy_protocol_v2",
+					"slow_start",
+				},
+			},
+			{
+				Config:      testAccTargetGroupConfig_healthCheckPort(rName, "TCP", "8081"),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`only "traffic-port" is supported for target groups with protocol "TCP"`),
+			},
+		},
+	})
+}
+
 func TestAccELBV2TargetGroup_udp(t *testing.T) {
 	var conf elbv2.TargetGroup
 	rName := sdkacctest.RandomWithPrefix(acctest.ResourcePrefix)
@@ -2464,6 +2517,30 @@ resource "aws_vpc" "test" {
   }
 }
 `, rName, deregDelay)
+}
+
+func testAccTargetGroupConfig_healthCheckPort(rName, protocol, port string) string {
+	return fmt.Sprintf(`
+resource "aws_lb_target_group" "test" {
+  name     = %[1]q
+  port     = 80
+  protocol = %[2]q
+  vpc_id   = aws_vpc.test.id
+
+  health_check {
+    protocol = %[2]q
+    port     = %[3]q
+  }
+}
+
+resource "aws_vpc" "test" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = %[1]q
+  }
+}
+`, rName, protocol, port)
 }
 
 func testAccTargetGroupConfig_basicUdp(rName string) string {
