@@ -70,7 +70,7 @@ func TestResourceServiceMySQLBinaryLogRetentionValidation(t *testing.T) {
 	for _, testCase := range []struct {
 		name               string
 		enabled, retention cty.Value
-		previousRetention  bool
+		previousFlag       string
 		withoutMySQL       bool
 		wantError          bool
 	}{
@@ -80,7 +80,9 @@ func TestResourceServiceMySQLBinaryLogRetentionValidation(t *testing.T) {
 		{name: "retention with disabled binary log", enabled: cty.StringVal("false"), retention: cty.NumberIntVal(7), wantError: true},
 		{name: "unknown binary log flag", enabled: cty.UnknownVal(cty.String), retention: cty.NumberIntVal(7)},
 		{name: "unknown retention", enabled: cty.StringVal("false"), retention: cty.UnknownVal(cty.Number)},
-		{name: "disable with computed retention from state", enabled: cty.StringVal("false"), retention: cty.NullVal(cty.Number), previousRetention: true},
+		{name: "disable with computed retention from state", enabled: cty.StringVal("false"), retention: cty.NullVal(cty.Number), previousFlag: "true"},
+		{name: "retention with enabled binary log from state", enabled: cty.NullVal(cty.String), retention: cty.NumberIntVal(3), previousFlag: "true"},
+		{name: "retention with disabled binary log from state", enabled: cty.NullVal(cty.String), retention: cty.NumberIntVal(3), previousFlag: "false", wantError: true},
 		{name: "other service without MySQL configuration", enabled: cty.NullVal(cty.String), retention: cty.NullVal(cty.Number), withoutMySQL: true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -99,22 +101,31 @@ func TestResourceServiceMySQLBinaryLogRetentionValidation(t *testing.T) {
 				})
 			}
 			previous := &terraform.InstanceState{RawConfig: rawConfig}
-			if testCase.previousRetention {
+			if testCase.previousFlag != "" {
 				initial := schema.TestResourceDataRaw(t, resource.Schema, testMySQLServiceConfig(map[string]interface{}{
-					"bin_log_enabled": "true", "binlog_retention_days": 7,
+					"bin_log_enabled": testCase.previousFlag, "binlog_retention_days": 7,
 				}))
 				initial.SetId(testMySQLServiceID)
 				previous = initial.State()
 				previous.RawConfig = rawConfig
 			}
 			config := terraform.NewResourceConfigShimmed(rawConfig, resource.CoreConfigSchema())
-			_, err := resource.Diff(context.Background(), previous, config, nil)
+			// Keep the immutable service arguments so updates are not recalculated as replacements.
+			for key, value := range testMySQLServiceConfig(nil) {
+				if key != "mysql" {
+					config.Config[key] = value
+				}
+			}
+			diff, err := resource.Diff(context.Background(), previous, config, nil)
 			if testCase.wantError {
 				if err == nil || !strings.Contains(err.Error(), "binlog_retention_days") {
 					t.Fatalf("expected binary log retention validation error, got %v", err)
 				}
 			} else if err != nil {
 				t.Fatalf("valid binary log configuration rejected: %s", err)
+			}
+			if err == nil && testCase.previousFlag != "" && diff != nil && diff.RequiresNew() {
+				t.Fatal("binary log validation must use an in-place update")
 			}
 		})
 	}

@@ -30,10 +30,14 @@ func validateMySQLServiceConfiguration(d *schema.ResourceDiff) error {
 		if !enabled.IsKnown() {
 			return nil
 		}
+		flag := ""
 		if !enabled.IsNull() {
-			if value, _, err := nullable.Bool(enabled.AsString()).Value(); err == nil && value {
-				return nil
-			}
+			flag = enabled.AsString()
+		} else if d.NewValueKnown("mysql.0.bin_log_enabled") {
+			flag = d.Get("mysql.0.bin_log_enabled").(string)
+		}
+		if value, _, err := nullable.Bool(flag).Value(); err == nil && value {
+			return nil
 		}
 	}
 	return fmt.Errorf("mysql.0.binlog_retention_days requires bin_log_enabled = true")
