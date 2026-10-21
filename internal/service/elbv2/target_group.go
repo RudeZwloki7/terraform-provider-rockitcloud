@@ -1,6 +1,7 @@
 package elbv2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -22,10 +23,13 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/verify"
 )
 
+const healthCheckPortTrafficPort = "traffic-port"
+
 func ResourceTargetGroup() *schema.Resource {
 	return &schema.Resource{
 		CustomizeDiff: customdiff.Sequence(
 			verify.SetTagsDiff,
+			customizeDiffTargetGroupHealthCheckPort,
 		),
 
 		Create: resourceTargetGroupCreate,
@@ -87,14 +91,10 @@ func ResourceTargetGroup() *schema.Resource {
 							ValidateFunc: validTargetGroupHealthCheckPath,
 						},
 						"port": {
-							Type:     schema.TypeString,
-							Optional: true,
-							Default:  "traffic-port",
-							ValidateFunc: validation.StringInSlice([]string{
-								"traffic-port",
-							}, true),
-							// FIXME: Uncomment validation if  ELB API supports notvalidTargetGroupHealthCheckPort only `traffic-port` value.
-							// ValidateFunc:     validTargetGroupHealthCheckPort,
+							Type:             schema.TypeString,
+							Optional:         true,
+							Default:          healthCheckPortTrafficPort,
+							ValidateFunc:     validTargetGroupHealthCheckPort,
 							DiffSuppressFunc: suppressIfTargetType(elbv2.TargetTypeEnumLambda),
 						},
 						"protocol": {
@@ -884,24 +884,33 @@ func validateSlowStart(v interface{}, k string) (ws []string, errors []error) {
 	return
 }
 
-//nolint:unused // HealthCheckPort can have only `traffic-port` value.
-func validTargetGroupHealthCheckPort(v interface{}, k string) (ws []string, errors []error) { //nolint:unparam
+func validTargetGroupHealthCheckPort(v interface{}, k string) (ws []string, errors []error) {
 	value := v.(string)
 
-	if value == "traffic-port" {
+	if value == healthCheckPortTrafficPort {
 		return
 	}
 
-	port, err := strconv.Atoi(value)
-	if err != nil {
-		errors = append(errors, fmt.Errorf("%q must be a valid port number (1-65536) or %q", k, "traffic-port"))
-	}
-
-	if port < 1 || port > 65536 {
-		errors = append(errors, fmt.Errorf("%q must be a valid port number (1-65536) or %q", k, "traffic-port"))
+	if port, err := strconv.Atoi(value); err != nil || port < 1 || port > 65535 {
+		errors = append(errors, fmt.Errorf("%q must be a valid port number (1-65535) or %q", k, healthCheckPortTrafficPort))
 	}
 
 	return
+}
+
+func customizeDiffTargetGroupHealthCheckPort(_ context.Context, diff *schema.ResourceDiff, _ interface{}) error {
+	if !diff.NewValueKnown("protocol") || !diff.NewValueKnown("health_check.0.port") {
+		return nil
+	}
+
+	protocol := diff.Get("protocol").(string)
+	port := diff.Get("health_check.0.port").(string)
+
+	if port == healthCheckPortTrafficPort || strings.EqualFold(protocol, elbv2.ProtocolEnumHttp) {
+		return nil
+	}
+
+	return fmt.Errorf("health_check.0.port: only %q is supported for target groups with protocol %q", healthCheckPortTrafficPort, protocol)
 }
 
 func TargetGroupSuffixFromARN(arn *string) string {
