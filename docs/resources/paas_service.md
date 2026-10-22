@@ -1207,6 +1207,7 @@ If you need to use such a parameter, contact [technical support].
 * `profile` - (Optional, Editable) Indicates which operations to profile.
     * _Valid values:_ `off`, `slowOp`, `all`
 * `slowms` - (Optional, Editable) The operation time threshold in milliseconds, above which the operation is considered slow.
+  If omitted, the parameter is not sent to the API. On creation, MongoDB uses its default of `100` ms. An explicitly configured `0` is sent as zero.
     * _Valid values:_ From 0 to 36000000
 * `storage_engine_cache_size` - (Optional, Editable) The maximum size of internal cache in GiB used to store all data.
   A floating-point number.
