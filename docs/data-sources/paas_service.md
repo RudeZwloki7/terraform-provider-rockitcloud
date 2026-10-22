@@ -374,6 +374,8 @@ The `user` block has the following structure:
 In addition to the common attributes for all services [described above](#attribute-reference),
 the following attributes are exported only for a MySQL service:
 
+* `bin_log_enabled` - Indicates whether the binary log is enabled.
+* `binlog_retention_days` - The binary log retention period in days.
 * `class` - The service class.
 * `connect_timeout` - The number of seconds that the _mysqld_ server waits for a connect packet before responding with **Bad handshake**.
 * `database` - List of MySQL databases with parameters. The structure of this block is [described below](#mysql-database).
@@ -440,6 +442,7 @@ The `user` block has the following structure:
 
 The `user` block has the following structure:
 
+* `global_privileges` - Set of privileges on all databases, including system databases (`*.*`).
 * `host` - The hostname or IP address.
 * `id` - The ID of the user.
 * `name` - The MySQL user name.

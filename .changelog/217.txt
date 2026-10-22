@@ -1,0 +1,7 @@
+```release-note:enhancement
+resource/aws_paas_service: Add editable MySQL binary log settings and global user privileges
+```
+
+```release-note:enhancement
+data-source/aws_paas_service: Export MySQL binary log settings and global user privileges
+```
