@@ -5,6 +5,10 @@ ENHANCEMENTS:
 * data-source/aws_paas_service: Export MySQL binary log settings and global user privileges ([#217](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/217))
 * resource/aws_paas_service: Add editable MySQL binary log settings and global user privileges ([#217](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/217))
 
+BUG FIXES:
+
+* resource/aws_paas_service: Omit an unspecified MongoDB slowms parameter from API requests while preserving an explicitly configured zero ([#213](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/213))
+
 ## 26.2.1 (October 21, 2026)
 
 ENHANCEMENTS:
