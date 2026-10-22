@@ -1,5 +1,10 @@
 ## 26.3.0 (Unreleased)
 
+ENHANCEMENTS:
+
+* data-source/aws_paas_service: Export MySQL binary log settings and global user privileges ([#217](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/217))
+* resource/aws_paas_service: Add editable MySQL binary log settings and global user privileges ([#217](https://github.com/C2Devel/terraform-provider-rockitcloud/issues/217))
+
 ## 26.2.1 (October 21, 2026)
 
 ENHANCEMENTS:
