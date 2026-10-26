@@ -1,4 +1,4 @@
-## 26.3.0 (Unreleased)
+## 26.2.3 (October 26, 2026)
 
 ENHANCEMENTS:
 
